@@ -31,6 +31,10 @@ Optional flags:
                   same run. By default, only the CPU version is run.
 ```
 
+# The Global Alignment Problem, and the Needleman-Wunsch Algorithm:
+
+Question 2 here.
+
 # Code Analysis:
 
 ## Needleman-Wunsch Algorithm on the CPU:
@@ -87,3 +91,9 @@ Finally, we need to evaluate the best possibility for the alignment at this posi
 * <ins>Max of match and previous max:</ins> Then we compare the result of the match scoring (can also represent a mismatch in our case) to the result of the max operation done previously (line 14), and take the maximum between them.
 
 In the end we save the result of the previous operation into the output array (line 15).
+
+# Complexity Analysis:
+
+## Needleman-Wunsch Algorithm on the CPU:
+
+Question 5 here.
