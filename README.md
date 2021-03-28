@@ -31,13 +31,13 @@ Optional flags:
                   same run. By default, only the CPU version is run.
 ```
 
-# The Global Alignment Problem and the Needleman-Wunsch Algorithm:
+## The Global Alignment Problem and the Needleman-Wunsch Algorithm:
 
 Question 2 here.
 
-# Code Analysis:
+## Code Analysis:
 
-## Needleman-Wunsch Algorithm on the CPU:
+### Needleman-Wunsch Algorithm on the CPU:
 
 ```C++ {.line-numbers}
  1    void nw_cpu(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N) {
@@ -62,7 +62,7 @@ Question 2 here.
 
 The Needleman-Wunsch algorithm requires us to fill an array with sequences of scores in order to determine the correct global alignment between two strings of characters. Therefore, it starts by looping over the two strands on line 2 and 3. 
 
-### Extracting the values of the neighbors:
+#### ***Extracting the values of the neighbors:***
 
 During each iteration, the algorithm first needs to get the values of its neighbors in the matrix, specifically the value above (line 5), to the left (line 6), and to the upper left diagonal (line 7), relative to the current value. For each value that needs to be extracted here is the procedure:
 
@@ -72,7 +72,7 @@ During each iteration, the algorithm first needs to get the values of its neighb
 
 * <ins>topleft:</ins> If the current index in the query string is at position 0, then the value that needs to be extracted is the previous reference index plus 1 times -1. Otherwise, if the current index in the reference string is at position 0, then the value that needs to be extracted is the previous query index plus 1 times -1. Otherwise, take the value of the matrix from the position upper-left diagonal to current value.
 
-### Assigning a score to each possible alignment case:
+#### ***Assigning a score to each possible alignment case:***
 
 After that, we need to assign a score to each possible entry in the current position of the matrix. There are four such possibilities: An insertion (line 9), a deletion (line 10), a match (line 11), and a mismatch (line 11).
 
@@ -82,7 +82,7 @@ After that, we need to assign a score to each possible entry in the current posi
 
 * <ins>Match & Mismatch:</ins> A match or a mismatch represents the fact that current position in reference string may contain or not the same value as the query string. The score in this case is computed in the following way: Add the topleft value to the evaluation of the following expression ( If the value contained at the current position in the query string is equal to the value contained at the current position in the reference string, then return a score of a match (+1) else return the score of a mismatch (-1) )
 
-### Comparing the resulting scores:
+#### ***Comparing the resulting scores:***
 
 Finally, we need to evaluate the best possibility for the alignment at this position (lines 13 & 14). We do that by comparing the scores we computed previously for the insertion, deletion, match, and mismatch.
 
@@ -92,8 +92,8 @@ Finally, we need to evaluate the best possibility for the alignment at this posi
 
 In the end we save the result of the previous operation into the output array (line 15).
 
-# Complexity Analysis:
+## Complexity Analysis:
 
-## Needleman-Wunsch Algorithm on the CPU:
+### Needleman-Wunsch Algorithm on the CPU:
 
 Question 5 here.
