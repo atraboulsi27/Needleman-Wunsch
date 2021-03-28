@@ -31,7 +31,7 @@ Optional flags:
                   same run. By default, only the CPU version is run.
 ```
 
-# The Global Alignment Problem, and the Needleman-Wunsch Algorithm:
+# The Global Alignment Problem and the Needleman-Wunsch Algorithm:
 
 Question 2 here.
 
