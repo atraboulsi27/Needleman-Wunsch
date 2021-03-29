@@ -31,6 +31,13 @@ Optional flags:
                   same run. By default, only the CPU version is run.
 ```
 
+To run in a loop (only works for cpu now):
+
+```
+> chmod +x nw-loop.sh // only the first time
+> ./nw-loop.sh
+```
+
 ## The Global Alignment Problem, and the Needleman-Wunsch Algorithm:
 
 Question 2:
@@ -102,3 +109,5 @@ In the end we save the result of the previous operation into the output array (l
 ### Needleman-Wunsch Algorithm on the CPU:
 
 Question 5 here.
+
+<img src="res/nw-cpu-plot.png" alt="A run of the Needleman-Wunsch algorithm on the cpu" width="600">
