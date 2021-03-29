@@ -1,7 +1,7 @@
 
 make
 
-echo "# n, time (ms)"  > cpu.csv
+echo "n, time (ms)"  > cpu.csv
 
 for i in 10 100 1000 10000; do
     j=$(($i/10))
