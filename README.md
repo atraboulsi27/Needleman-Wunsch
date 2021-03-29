@@ -33,7 +33,12 @@ Optional flags:
 
 ## The Global Alignment Problem, and the Needleman-Wunsch Algorithm:
 
-Question 2 here.
+Question 2:
+
+1-The needleman wunsch algorithm solves the issue of the global alignment, which is the alignment of two entire sequences with eachother.
+
+2-This computation is used in the field of bioinformatics, in which similarities between two  amino acid sequences must be located to study their functional, structural and evolutionary relationships. The needleman-wunsch algorithm does so in an optimal maner, highlighting its importance for large sequences.
+
 
 ## Code Description:
 
