@@ -40,17 +40,6 @@ To run in a loop (only works for cpu now):
 
 ## The Global Alignment Problem, and the Needleman-Wunsch Algorithm:
 
-Question 2:
-
-```
-Describe the computation that you are planning to parallelize in this project. Your description should tackle the following questions:
-
-What is the problem that the computation solves?
-Why is the computation important and where is it used in practice?
-How does the computation work? What procedure does it follow to solve the problem?
-Use illustrations where needed. Make sure to cite any references that you use.
-```
-
 Before talking about the Needleman-Wunsch Algorithm, we must introduce the problem it tries to solve.
 
 In Biology, information is very often represented in the form of strands or sequences of molecules. Here are couple of examples:
