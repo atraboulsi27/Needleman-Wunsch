@@ -84,7 +84,7 @@ Our first parralelisation attempt consists of assigning threads in a diagonal ma
 
 In it you can see that accross the same reversed diagonal iteration, the cells cut by the line execute in parallel having their computed resources already computed by the previous diagonal block. As such, using one kernel we are able to iterate over all the matrix cells in a way that makes parallelisation obviously apparent. In the following image, you can see another way of representing the parallel pattern that we are trying to achieve:
 
-<img src="res/DiagonalThreads2.png" alt="GPU ALG 1" width="600">
+<img src="res/DiagonalThreadsIteration1_2.png" alt="GPU ALG 1" width="600">
 
 ## Code Description:
 
