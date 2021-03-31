@@ -80,6 +80,8 @@ However, in our case we are not interested in the traceback algorithm as we will
 
 Our first parralelisation attempt consists of assigning threads in a diagonal manner. The reason we chose this approach, is that given a position (i, j) to compute, we cannot start the computation of this cell berfore computing the values of the neighbors (i-1, j-1), (i-1, j), (i, j-1). If we were to go with the traditional approach of assigning threads to the matrix indices, we would end up with the problem of computing cells that do not have computed neighbors. However, assigning threads diagonally, we notice that every cell has its computational requirements ready before its computation. As a general guideline of how we plan to execute this plan, please have a look at the following diagram:
 
+<img src="res/DiagonalThreadsIteration1.png" alt="A run of the Needleman-Wunsch algorithm on the cpu" width="600">
+
 In it you can see that accross the same reversed diagonal iteration, the cells forming the line execute in parallel having their computed resourse already computed by the previous diaginal block.
 
 ## Code Description:
