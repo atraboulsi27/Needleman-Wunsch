@@ -51,7 +51,7 @@ How does the computation work? What procedure does it follow to solve the proble
 Use illustrations where needed. Make sure to cite any references that you use.
 ```
 
-Before talking the Needleman-Wunsch Algorithm, we must introduce the problem it tries to solve.
+Before talking about the Needleman-Wunsch Algorithm, we must introduce the problem it tries to solve.
 
 In Biology, information is very often represented in the form of strands or sequences of molecules. Here are couple of examples:
 
@@ -77,8 +77,15 @@ In a more particular way, we are interested in the Needleman-Wunsch Algorithm. T
 
 * <ins>Optimal Sub-Stucture</ins>:
 
-In our problem, optimal sub-structure presents itself as follows: If I know the optimal solution of a sub-sequence of the two strings, then I know that by adding one new character there are three possible solutions to this sub-problem. The first, is inserting a gap in the first sub-string, the second is inserting a gap in the second sub-string, and the third is inserting the new character from both strings, as is, may it be a match or a mismatch. To decide which option to choose, we rely on a basic scoring system. What this does, is assign a grade to each possible eventuality based on a pre-determined schema. In preactice it is common to assign a grade of -1 to any gap or mismatch, and a grade 1 to a match.
+In our problem, optimal sub-structure presents itself as follows: If I know the optimal solution of a sequence of two strings, then I know that by adding one new character to each string, there are three possible solutions to the optimal alignment of the newly formed strings. The first, is inserting a gap in the first string and adding the new character for the second string, the second option is adding the new character for the first string and a gap in the second string, and the third is inserting the new character for both strings, as is, may it be a match or a mismatch. To decide which option to choose, we rely on a basic scoring system. What this does, is assign a grade to each possible eventuality based on a pre-determined schema. In practice it is common to assign a grade of -1 to any gap or mismatch, and a grade of 1 to a match. When the grades are assigned, the best match is the one that has the highest grade.
 
+* <ins>Overlapping Sub-Problems and Memoization:</ins>:
+
+In our problem, we can show that given two strings of characters, it is possible to determine the best global alignment by deconstructing the problem into simpler sub-problems. As was shown previously, we can determine an optimal solution for the addition of one character to an already optimal sequence alignment. Therefore, by scanning sequences one by one, we can divide the problem into simpler sub-problems that are essantially the same as solving the optimal sub-structure problem. In our case, the optimal alignment can be determined by a memoization step that saves the grade of the current optimal solution into an array, by calculating it from the grade assigned to each possible solution to a previous sub-problem. Since the problems are decreasing in size until the two sub-strings reach a length of 0, the algorithm terminates correctly, filling an array of scores for each sub-sequence. Finally, a traceback step is required to extract the best global alignment from the array.  
+
+What makes the Needleman-Wunsch Algorithm different from the LCS dynamic algorithm, is the traceback step. In fact, to fill the matrix we use the exact same steps.
+
+However, in our case we are not interested in the traceback algorithm as we will concentrate on determining the grade of each sub-problem, and the filling of the memoization matrix.
 
 ## Code Description:
 
