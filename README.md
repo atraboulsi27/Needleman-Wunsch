@@ -61,7 +61,7 @@ The study of DNA is called genetics. It is the most basic storage medium of gene
 
 DNA can be thought of as a global, unique identifier that specifies the person you are. How similar two strands of DNA, tells us the relationships between two living beings or species. For example, twins will have an extremely similar DNA sequence. Brothers and sister, less so, humans and mokeys even less so. What is interesting about this, is that this common and global store of information can be to study the evolution of biological systems. By studying the similarities and differences between two of those strands, we establish how closely related two biolgical enitites are. From this we can produce many useful analyses, for example, two viruses that have a very similar DNA sequence might be cured by the very same medicine. 
 
-#### ***Proteins:***:
+#### ***Proteins:***
 
 Proteins could be said to be one of the most important building block of any biological system. Every protein is built from molecules called amino acids. There are 20 of them in total. What is important to know about proteins is that is not their content, but their 3D geometry determines their function. It is therefore, a very interesting problem to be able to determine the geometry of a protein. This shape is called a protein's fold, and is generally described by three interconnected structures. First, there is the primary structure which consists of the sequence of amino acids. Next, there is the secondary structure which is specified by the hydrogen bonds that form between these amino acids, forming shapes like alpha-helixes, and beta-sheets. Then, there is the tertiary structure that that arises from the combination of the previous folds and random interactions between the elements of the primary and secondary structures. 
 
@@ -150,6 +150,8 @@ In the end we save the result of the previous operation into the output array (l
 
 ### Needleman-Wunsch Algorithm on the CPU:
 
-Question 5 here.
+From the algorithm analysis section we can determine the complexity of the matrix filling for the Needleman-Wunsch Algorithm on the CPU using one thread. We have two nested loops that iterate over the code N times over a finite amount of constant operations. We can therefore, deduce that the time complexity of this algorithm is O(n^2)
 
 <img src="res/nw-cpu-plot.png" alt="A run of the Needleman-Wunsch algorithm on the cpu" width="600">
+
+This benchmark was run on an intel i9-9900K using 32GB of RAM running an Ubuntu 20.04 Operating System. As a note, running this algorithm on my machine using the code provided in main.cu with an input size of more than 60,000 produces a segmentation fault. As expected, the general shape of the curve produced by the benchmark  is quadratic, matching the time complexity established.
