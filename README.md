@@ -88,6 +88,7 @@ In it you can see that accross the same reversed diagonal iteration, the cells c
 
 However, the problem does not end here. Given the previous method of computing blocks, it is clear that while they are easily parallelizable, there is a synchrounicity problem between different executing blocks. Take the following as example:
 
+<img src="res/DiagonalBlocksIteration1.png" alt="GPU ALG 1" width="600">
 
 ## Code Description:
 
