@@ -42,14 +42,45 @@ To run in a loop (only works for cpu now):
 
 Question 2:
 
-1-The needleman wunsch algorithm solves the issue of the global alignment, which is the alignment of two entire sequences with eachother.
+```
+Describe the computation that you are planning to parallelize in this project. Your description should tackle the following questions:
 
-2-This computation is used in the field of bioinformatics, in which similarities between two  amino acid sequences must be located to study their functional, structural and evolutionary relationships. The needleman-wunsch algorithm does so in an optimal maner, highlighting its importance for large sequences.
+What is the problem that the computation solves?
+Why is the computation important and where is it used in practice?
+How does the computation work? What procedure does it follow to solve the problem?
+Use illustrations where needed. Make sure to cite any references that you use.
+```
+
+Before talking the Needleman-Wunsch Algorithm, we must introduce the problem it tries to solve.
+
+In Biology, information is very often represented in the form of strands or sequences of molecules. Here are couple of examples:
+
+#### ***DNA:*** 
+
+The study of DNA is called genetics. It is the most basic storage medium of genetic information in all eukaryotes as well as a lot prokaryotes. DNA is sequenced in a long strand of nucleatides that encodes the instructions required to produce every protein that constitutes a living being. There are four nucleatides, and are denominated by the letters A, T, C & G. They are basically molecules that can bind together to form the double stranded shape of DNA. 
+
+DNA can be thought of as a global, unique identifier that specifies the person you are. How similar two strands of DNA, tells us the relationships between two living beings or species. For example, twins will have an extremely similar DNA sequence. Brothers and sister, less so, humans and mokeys even less so. What is interesting about this, is that this common and global store of information can be to study the evolution of biological systems. By studying the similarities and differences between two of those strands, we establish how closely related two biolgical enitites are. From this we can produce many useful analyses, for example, two viruses that have a very similar DNA sequence might be cured by the very same medicine. 
+
+#### ***Proteins:***:
+
+Proteins could be said to be one of the most important building block of any biological system. Every protein is built from molecules called amino acids. There are 20 of them in total. What is important to know about proteins is that is not their content, but their 3D geometry determines their function. It is therefore, a very interesting problem to be able to determine the geometry of a protein. This shape is called a protein's fold, and is generally described by three interconnected structures. First, there is the primary structure which consists of the sequence of amino acids. Next, there is the secondary structure which is specified by the hydrogen bonds that form between these amino acids, forming shapes like alpha-helixes, and beta-sheets. Then, there is the tertiary structure that that arises from the combination of the previous folds and random interactions between the elements of the primary and secondary structures. 
+
+What is interesting about what was said previously is that the tertiary structure of a protein (its 3D geometry), is entirely determined by its primary structure (the strand of amino acids). Therefore, an important question arises: given a random string of amino acids, are you able to predict the 3D shape that a protein will take? This has been shown to be an NP-Complete problem. As such, we cannot, yet, predict the shape of any protein fast enough from a given strand of amino acids. However, what we know, is that very similar protein strands might fold similarly locally. Therefore, if you know how a particular strand folds, you maybe could use this information to make general predictions or guesses about how another similar strand might generally fold (However, this method usually fails in practice).
+
+#### ***The Global Alignment Problem:***
+
+However, we are computer scientists, we prefer thinking of things in terms of data structures and algorithms. What does all of this sounds like to us? Well, a strand of only four possible characters sounds like a string or an array of base 4 numbers. Similarly, a strand of 20 possible characters, sounds like a string or array of base 20 characters. If the biologists were to give us the comparison criterias, we might be able to determine a very fast way of comparing these strings. We could therefore, analyse a large amount of data, extracting value from it. As it happens to be, this problem is called the alignment problem.
+
+There are two types of alignment methods, local alignment and global alignment. In our case, we are interested in global alignment. This method is very useful when comparing two very similar strands. This problem states, given two strings, align the elements between each of those strings such that moving any element in any string would result in a lower match rate. You are allowed to add spaces between two elements in the two strings to get a better match. In biology, theses spaces might be interesting to analyse mutations that could have arisen, they are alled indel.
+
+In a more particular way, we are interested in the Needleman-Wunsch Algorithm. This algorithm solves the issue of global alignment by using a dynamic programming approach. (To Be Continued.)
 
 
 ## Code Description:
 
-### Needleman-Wunsch Algorithm on the CPU:
+### The Needleman-Wunsch Algorithm on the CPU:
+
+The Needleman-Wunsch algorithm requires us to fill an array with sequences of scores in order to determine the correct global alignment between two strings of characters.
 
 ```C++ {.line-numbers}
  1    void nw_cpu(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N) {
@@ -72,7 +103,7 @@ Question 2:
 18    }
 ```
 
-The Needleman-Wunsch algorithm requires us to fill an array with sequences of scores in order to determine the correct global alignment between two strings of characters. Therefore, it starts by looping over the two strands on line 2 and 3. 
+It starts by looping over the two strands on line 2 and 3. 
 
 #### ***Extracting the values of the neighbors:***
 
