@@ -71,9 +71,13 @@ What is interesting about what was said previously is that the tertiary structur
 
 However, we are computer scientists, we prefer thinking of things in terms of data structures and algorithms. What does all of this sounds like to us? Well, a strand of only four possible characters sounds like a string or an array of base 4 numbers. Similarly, a strand of 20 possible characters, sounds like a string or array of base 20 characters. If the biologists were to give us the comparison criterias, we might be able to determine a very fast way of comparing these strings. We could therefore, analyse a large amount of data, extracting value from it. As it happens to be, this problem is called the alignment problem.
 
-There are two types of alignment methods, local alignment and global alignment. In our case, we are interested in global alignment. This method is very useful when comparing two very similar strands. This problem states, given two strings, align the elements between each of those strings such that moving any element in any string would result in a lower match rate. You are allowed to add spaces between two elements in the two strings to get a better match. In biology, theses spaces might be interesting to analyse mutations that could have arisen, they are alled indel.
+There are two types of alignment methods, local alignment and global alignment. In our case, we are interested in global alignment. This method is very useful when comparing two very similar strands. This problem states, given two strings, align the elements between each of those strings such that moving any element in any string would result in a lower or equal match rate. You are allowed to add spaces between two elements in the two strings to get a better match. In biology, theses spaces might be interesting to analyse mutations that could have arisen, they are alled indel. As we can see this problem is very similar, to a problem we know all too well in computer science, and that is the Longest Common Sub-sequence (LCS).
 
-In a more particular way, we are interested in the Needleman-Wunsch Algorithm. This algorithm solves the issue of global alignment by using a dynamic programming approach. (To Be Continued.)
+In a more particular way, we are interested in the Needleman-Wunsch Algorithm. This algorithm solves the issue of global alignment by implementing a scoring system for the match rate, using a dynamic programming approach that is quite similar to the LCS Problem. As we know, dynamic programming requires two preliminary conditions about a problem to be fullfiled in order work. These conditions are optimal substructure, and overlapping sub-problems. So, how are, in our case, these requirements met?
+
+* <ins>Optimal Sub-Stucture</ins>:
+
+In our problem, optimal sub-structure presents itself as follows: If I know the optimal solution of a sub-sequence of the two strings, then I know that by adding one new character there are three possible solutions to this sub-problem. The first, is inserting a gap in the first sub-string, the second is inserting a gap in the second sub-string, and the third is inserting the new character from both strings, as is, may it be a match or a mismatch. To decide which option to choose, we rely on a basic scoring system. What this does, is assign a grade to each possible eventuality based on a pre-determined schema. In preactice it is common to assign a grade of -1 to any gap or mismatch, and a grade 1 to a match.
 
 
 ## Code Description:
@@ -82,7 +86,7 @@ In a more particular way, we are interested in the Needleman-Wunsch Algorithm. T
 
 The Needleman-Wunsch algorithm requires us to fill an array with sequences of scores in order to determine the correct global alignment between two strings of characters.
 
-```C++ {.line-numbers}
+```C++
  1    void nw_cpu(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N) {
  2        for(int q = 0; q < N; ++q) {
  3            for (int r = 0; r < N; ++r) {
