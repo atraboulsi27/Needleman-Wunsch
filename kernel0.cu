@@ -7,30 +7,59 @@
 __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* output_matrix, unsigned int N, unsigned int iteration_number) {
 
 
-    // Get the position of the block inside the matrix.
-    unsigned int block_row = blockIdx.x;
-    unsigned int block_col = iteration_number - block_row; 
-    
-
-    // Transformation of the 1D thread vector into a 2D diagonal thread vector.
-    unsigned int thread_diag_pos_x = (BLOCK_SIZE - 1) - threadIdx.x;
-    unsigned int thread_diag_pos_y = threadIdx.x;
-
     for( unsigned int diagonal = 0; diagonal < BLOCK_SIZE; diagonal++ ) {
 
-        // Get the position of the thread inside the block
-        int pos_in_block_x = (BLOCK_SIZE - 1) - thread_diag_pos_x;
-        int pos_in_block_y = diagonal - pos_in_block_x;
+        // Verify that the diagonal thread index does not exceed the maximum number of elements allowed by the diagonal at this iteration.
+        if( threadIdx.x <= diagonal  ) {
 
-        // Calculate the position of the thread inside the matrix.
-        int pos_in_matrix =  block_row * N + block_col; 
+            // Get the position of the thread inside the block.
+            int pos_in_block_x = threadIdx.x;
+            int pos_in_block_y = diagonal - pos_in_block_x;
 
-        // Calculate left, top, and top-left.
-        int top = (thread_diag_pos_x == (BLOCK_SIZE - 1) && blockIdx.x == 0) ? (iteration_number + 1) : matrix[ pos_in_matrix - N ];
-        int left = (thread_diag_pos_y == (BLOCK_SIZE - 1) && blockIdx.x == gridDim.x - 1) ? () : matrix[ pos_in_matrix - 1];
-        int topleft = () ? () : matrix[ pos_in_matrix - N - 1];
+            // Calculate the positions of the thread inside the matrix.
+            int mat_row = iteration_number * blockDim.x + pos_in_block_y;
+            int mat_col = iteration_number * blockDim.x + pos_in_block_x;
+            
+            if( mat_row < N && mat_col < N ) {
+
+                // Calculate value left, top, and top-left neighbors.
+                int top = 
+                    (mat_row == 0) ? 
+                        (iteration_number + 1)*DELETION : matrix[ (mat_row - 1)*N + mat_col ];
+                
+                int left = 
+                    (mat_col == 0) ? 
+                        (iteration_number + 1)*INSERTION : matrix[ mat_row*N + (mat_col - 1) ];
+                
+                int topleft = 
+                    (mat_row == 0) ? 
+                        (iteration_number + 1)*DELETION : (mat_col == 0) ? 
+                            (iteration_number + 1)*INSERTION : matrix[ (mat_row - 1)*N + (mat_col - 1) ];
+
+                // Determine scores of the three possible outcomes: insertion, deletion, and match.
+                int insertion = top  + INSERTION;
+                int deletion  = left + DELETION;
+
+                // Get the characters to verify if there is a match.
+                char ref_char   = reference[];
+                char query_char = query[];
+
+                int match = topleft + (ref_char == query_char) ? MATCH : MISMATCH;
+                
+                // Select the maximum between the three.
+                int max = (insertion > deletion) ? insertion : deletion;
+                max = (match > max) ? match : max; 
+
+                // Update the matrix at the correct position
+                matrix[  mat_row*N + mat_col ] = max;
+                
+            }
+        }
+
+        __syncthreads();
 
     }
+
 
 }
 
@@ -46,7 +75,13 @@ void nw_run(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, u
 
 void nw_gpu0(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, unsigned int N) {
 
+    for(int iter=0; iter < 2*N; iter++) {
 
+        nw_run(reference_d, query_d, matrix_d, N, iter);
+
+        cudaDeviceSynchronize();
+
+    }
 
 }
 
