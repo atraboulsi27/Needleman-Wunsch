@@ -6,9 +6,15 @@
 
 __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
 
+
     // Transform 1D Grid Coordinates into 2D Diagonal Coordinates.
     int diagonal_block_row = blockIdx.x;
     int diagonal_block_col = iteration_number - diagonal_block_row;
+
+    if( iteration_number > gridDim.x) {
+        diagonal_block_row = ( (N + BLOCK_SIZE - 1)/BLOCK_SIZE ) - blockIdx.x - 1;
+        diagonal_block_col = iteration_number - diagonal_block_row;
+    }
 
     // Get the effective coordinates of the block int the matrix.
     int block_row = diagonal_block_row * blockDim.x;
@@ -56,7 +62,7 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
                 // Select the maximum between the three.
                 int max = (insertion > deletion) ? insertion : deletion;
                 max = (match > max) ? match : max; 
-
+                
                 // Update the matrix at the correct position
                 matrix[  mat_row*N + mat_col ] = max;
                 
@@ -103,8 +109,7 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
                 int max = (insertion > deletion) ? insertion : deletion;
                 max = (match > max) ? match : max; 
 
-                if (mat_row == 0 && mat_col == 1023)
-                    printf("row: %d, col: %d, max: %d, del: %d, ins: %d, match: %d, %c, %c\n", mat_row, mat_col, max, deletion, insertion, match, ref_char, query_char);
+                // printf("row: %d, col: %d, max: %d, del: %d, ins: %d, match: %d, %c, %c\n", mat_row, mat_col, max, deletion, insertion, match, ref_char, query_char);
 
                 matrix[  mat_row*N + mat_col ] = max;
                 
@@ -120,12 +125,12 @@ void nw_gpu0(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, 
     
     unsigned int numThreadsPerBlock = BLOCK_SIZE;
 
-    for(int iter=0; iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE; iter++) {
+    for(int iter=0; iter < 2* ( (N + BLOCK_SIZE - 1) / BLOCK_SIZE) - 1; iter++) {
 
         // Configure next run
-        unsigned int numBlocks = (iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iter + 1) : (2 * (N + BLOCK_SIZE - 1) / BLOCK_SIZE - iter - 1);
+        unsigned int numBlocks = (iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iter + 1) : (2*((N + BLOCK_SIZE - 1) / BLOCK_SIZE) - iter - 1);
       
-        printf("%d\n", numBlocks);
+        // printf("%d, %d\n", iter, numBlocks);
         // Launch kernel
         nw_kernel<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
         
