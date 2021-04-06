@@ -20,14 +20,21 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
     int block_row = diagonal_block_row * blockDim.x;
     int block_col = diagonal_block_col * blockDim.x;
 
-    for( int diagonal = 0; diagonal < BLOCK_SIZE; diagonal++ ) {
+    for( int diagonal = 0; diagonal < 2*BLOCK_SIZE; diagonal++ ) {
+
+        int thread_limit = (diagonal < BLOCK_SIZE) ? (diagonal) : (2*BLOCK_SIZE-diagonal);
 
         // Verify that the diagonal thread index does not exceed the maximum number of elements allowed by the diagonal at this iteration.
-        if( threadIdx.x <= diagonal  ) {
+        if( threadIdx.x <= thread_limit ) {
 
             // Get the position of the thread inside the block.
             int pos_in_block_x = threadIdx.x;
             int pos_in_block_y = diagonal - pos_in_block_x;
+
+            if( diagonal > BLOCK_SIZE ) {
+                pos_in_block_x = BLOCK_SIZE - threadIdx.x - 1;
+                pos_in_block_y = diagonal - pos_in_block_x - 1;
+            }
 
             // Calculate the positions of the thread inside the matrix.
             int mat_row = block_row + pos_in_block_y;
@@ -73,51 +80,6 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
 
     }
 
-    for( int diagonal = BLOCK_SIZE; diagonal < 2*BLOCK_SIZE; diagonal++ ) {
-
-        if( threadIdx.x < 2*BLOCK_SIZE - diagonal ) {
-
-            int pos_in_block_x = BLOCK_SIZE - threadIdx.x - 1;
-            int pos_in_block_y = diagonal - pos_in_block_x - 1;
-
-            int mat_row = block_row + pos_in_block_y;
-            int mat_col = block_col + pos_in_block_x;
-
-            if( mat_row < N && mat_col < N ) {
-
-                int top = 
-                    (mat_row == 0) ? 
-                        ((mat_col + 1)*DELETION) : matrix[ (mat_row - 1)*N + mat_col ];
-                
-                int left = 
-                    (mat_col == 0) ? 
-                        ((mat_row + 1)*INSERTION) : matrix[ mat_row*N + (mat_col - 1) ];
-                
-                int topleft = 
-                    (mat_row == 0) ? 
-                        (mat_col*DELETION) : (mat_col == 0) ? 
-                            (mat_row*INSERTION) : matrix[ (mat_row - 1)*N + (mat_col - 1) ];
-
-                int insertion = top  + INSERTION;
-                int deletion  = left + DELETION;
-
-                char ref_char   = reference[mat_col];
-                char query_char = query[mat_row];
-
-                int match = topleft + ( (ref_char == query_char) ? MATCH : MISMATCH );
-                
-                int max = (insertion > deletion) ? insertion : deletion;
-                max = (match > max) ? match : max; 
-
-                // printf("row: %d, col: %d, max: %d, del: %d, ins: %d, match: %d, %c, %c\n", mat_row, mat_col, max, deletion, insertion, match, ref_char, query_char);
-
-                matrix[  mat_row*N + mat_col ] = max;
-                
-            }
-        }
-
-        __syncthreads();
-    }
 }
 
 
