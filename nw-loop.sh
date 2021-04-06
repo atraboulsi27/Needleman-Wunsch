@@ -1,6 +1,13 @@
 
 help=false
 
+kernel0=""
+kernel1=""
+kernel2=""
+kernel3=""
+
+title="n, cpu (ms)"
+
 for flag in "$@"
 do
     case $flag in
@@ -18,15 +25,23 @@ do
         shift
         ;;
         -0)
+            kernel0="-0"
+            title="$title, kernel 0 (ms)" 
         shift
         ;;
         -1)
+            kernel1="-1"
+            title="$title, kernel 1 (ms)" 
         shift
         ;;
         -2)
+            kernel2="-2"
+            title="$title, kernel 2 (ms)" 
         shift
         ;;
         -3)
+            kernel3="-3"
+            title="$title, kernel 3 (ms)" 
         shift
         ;;
         *)
@@ -35,28 +50,37 @@ do
     esac
 done
 
-if [ ! $help ]
-then
     make
 
-    echo "n, time (ms)"  > cpu.csv
+    echo $title  > benchmark.csv
 
     for i in 10 100 1000 10000; do
         j=$(($i/10))
         while [ $j -lt $i ]; do 
-            printf "$j, " >> cpu.csv
-            ./nw -N $j | grep -oE "[0-9]+\.[0-9]+" >> cpu.csv
+            printf "$j, " >> benchmark.csv
+            output=`./nw -N $j $kernel0 $kernel1 $kernel2 $kernel3 | grep -E "CPU|version" | grep -oE "[0-9]+\.[0-9]+"`
+            csv=`echo $output | cut -d \  -f 1`
+            if [ $kernel0 != "" ] 
+            then
+                csv="$csv, `echo $output | cut -d \  -f 2`"
+            fi
+            echo $csv >> benchmark.csv
             j=$(($j+$i/10))
         done
     done
 
     j=10000
     while [ $j -le 50000 ]; do 
-        printf "$j, " >> cpu.csv
-        ./nw -N $j | grep -oE "[0-9]+\.[0-9]+" >> cpu.csv
+        printf "$j, " >> benchmark.csv
+        output=`./nw -N $j $kernel0 $kernel1 $kernel2 $kernel3 | grep -E "CPU|version" | grep -oE "[0-9]+\.[0-9]+"`
+        csv=`echo $output | cut -d \  -f 1`
+        if [ $kernel0 != "" ]
+        then
+            csv="$csv, `echo $output | cut -d \  -f 2`"
+        fi
+        echo $csv >> benchmark.csv
         j=$(($j+5000))
     done
 
     make clean
 
-fi
