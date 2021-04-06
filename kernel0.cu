@@ -62,10 +62,10 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
                 // Select the maximum between the three.
                 int max = (insertion > deletion) ? insertion : deletion;
                 max = (match > max) ? match : max; 
-                
+               
                 // Update the matrix at the correct position
                 matrix[  mat_row*N + mat_col ] = max;
-                
+            
             }
         }
 
@@ -130,7 +130,7 @@ void nw_gpu0(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, 
         // Configure next run
         unsigned int numBlocks = (iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iter + 1) : (2*((N + BLOCK_SIZE - 1) / BLOCK_SIZE) - iter - 1);
       
-        // printf("%d, %d\n", iter, numBlocks);
+        //printf("%d, %d\n", iter, numBlocks);
         // Launch kernel
         nw_kernel<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
         
