@@ -25,16 +25,16 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
                 // Calculate value left, top, and top-left neighbors.
                 int top = 
                     (mat_row == 0) ? 
-                        (mat_col + 1)*DELETION : matrix[ (mat_row - 1)*N + mat_col ];
+                        ((mat_col + 1)*DELETION) : matrix[ (mat_row - 1)*N + mat_col ];
                 
                 int left = 
                     (mat_col == 0) ? 
-                        (mat_row + 1)*INSERTION : matrix[ mat_row*N + (mat_col - 1) ];
+                        ((mat_row + 1)*INSERTION) : matrix[ mat_row*N + (mat_col - 1) ];
                 
                 int topleft = 
                     (mat_row == 0) ? 
-                        mat_col*DELETION : (mat_col == 0) ? 
-                            mat_row*INSERTION : matrix[ (mat_row - 1)*N + (mat_col - 1) ];
+                        (mat_col*DELETION) : (mat_col == 0) ? 
+                            (mat_row*INSERTION) : matrix[ (mat_row - 1)*N + (mat_col - 1) ];
 
                 // Determine scores of the three possible outcomes: insertion, deletion, and match.
                 int insertion = top  + INSERTION;
@@ -50,7 +50,8 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
                 int max = (insertion > deletion) ? insertion : deletion;
                 max = (match > max) ? match : max; 
 
-                // printf("row: %d, col: %d, max: %d, del: %d, ins: %d, match: %d, %c, %c\n", mat_row, mat_col, max, deletion, insertion, match, ref_char, query_char);
+                if (mat_row == 0 && mat_col == 1023)
+                    printf("row: %d, col: %d, max: %d, del: %d, ins: %d, match: %d, %c, %c\n", mat_row, mat_col, max, deletion, insertion, match, ref_char, query_char);
 
                 // Update the matrix at the correct position
                 matrix[  mat_row*N + mat_col ] = max;
@@ -70,13 +71,14 @@ void nw_gpu0(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, 
     
     unsigned int numThreadsPerBlock = BLOCK_SIZE;
 
-    for(int iter=0; iter < 2*(N + BLOCK_SIZE - 1)/BLOCK_SIZE; iter++) {
+    for(int iter=0; iter < 2*(N + BLOCK_SIZE - 1) / BLOCK_SIZE; iter++) {
 
         // Configure next run
-        unsigned int numBlocks = (iteration_number < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iteration_number + 1) : (2 * (N + BLOCK_SIZE - 1) / BLOCK_SIZE - iteration_number - 1);
-        
+        unsigned int numBlocks = (iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iter + 1) : (2 * (N + BLOCK_SIZE - 1) / BLOCK_SIZE - iter - 1);
+      
+        printf("%d\n", numBlocks);
         // Launch kernel
-        nw_kernel<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iteration_number);
+        nw_kernel<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
         
         cudaDeviceSynchronize();
 

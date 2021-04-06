@@ -1,6 +1,8 @@
 
 nw
 
+kernel_test.cu
+
 *.csv
 
 *.o
