@@ -252,7 +252,7 @@ In conclusion, the job of `nw_gpu0` is to control and synchronise kernel calls s
 #### nw_kernel0:
 
 The `nw_kernel0` kernel has many aspects that makes it a little bit unintuitive, and that is, that threads and blocks run diagonally to the output matrix.
-This causes the calculation of positions in the matrix a little bit more awakward.
+This causes the calculation of positions in the matrix to be a little bit more awakward.
 However, what it essantially does can be broken down into two parts:
 
 1. Calculate the position of the executing block in the output matrix (line 4 - 11):
