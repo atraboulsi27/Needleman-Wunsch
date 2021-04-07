@@ -278,7 +278,7 @@ We start looping over all the reversed diagonal within the currently executing b
 
 We calculate an upper bound for the thread index for each iteration of the loop (line 15) and then only let threads passthorugh if they are within this upper-bound (line 18).
 
-In the same that we calculated the position of x and y for the block in the matrix, we calculate the position of x and y of threads within this block based on the diagonals (line 21 & 22). We also do a verfication for the diagonal size as we did for the blocks (line 24), and update the positions of the threads accordingly.
+In the same that we calculated the position of x and y for the block in the matrix, we calculate the position x and y of threads within this block based on the diagonals (line 21 & 22). We also do a verfication for the diagonal size as we did for the blocks (line 24), and update the positions of the threads accordingly.
 
 Finally, we can calculate the threads x and coordinates within the ouput matrix (line 30 & 31).
 
