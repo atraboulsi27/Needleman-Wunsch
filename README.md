@@ -156,8 +156,7 @@ In the end we save the result of the previous operation into the output array (l
 ### The Needleman-Wunsch Algorithm on the GPU:
 
 As you can see, the Needleman-Wunsch Algorithm on the GPU presents itself, in two parts. 
-First, there is a driver function `nw_gpu0` that runs on the CPU that controls, and then, there is `nw_kernel` that runs on the gpu.
-As 
+First, there is a driver function `nw_gpu0` that runs on the CPU, and then, there is `nw_kernel` that runs on the gpu.
 
 ```C++
  1  __global__ void nw_kernel0(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
@@ -172,72 +171,68 @@ As
 10            diagonal_block_col = iteration_number - diagonal_block_row;
 11        }
 12  
-13        // Get the effective coordinates of the block int the matrix.
-14        int block_row = diagonal_block_row * blockDim.x;
-15        int block_col = diagonal_block_col * blockDim.x;
-16 
-17        for( int diagonal = 0; diagonal < 2*BLOCK_SIZE; diagonal++ ) {
-18
-19            int thread_limit = (diagonal < BLOCK_SIZE) ? (diagonal) : (2*BLOCK_SIZE-diagonal);
-20  
-21            // Verify that the diagonal thread index does not exceed the maximum number of elements allowed by the diagonal at this iteration.
-22            if( threadIdx.x <= thread_limit ) {
-23
-24                // Get the position of the thread inside the block.
-25                int pos_in_block_x = threadIdx.x;
-26                int pos_in_block_y = diagonal - pos_in_block_x;
-27  
-28                if( diagonal > BLOCK_SIZE ) {
-29                    pos_in_block_x = BLOCK_SIZE - threadIdx.x - 1;
-30                    pos_in_block_y = diagonal - pos_in_block_x - 1;
-31                }
-32  
-33                // Calculate the positions of the thread inside the matrix.
-34                int mat_row = block_row + pos_in_block_y;
-35                int mat_col = block_col + pos_in_block_x;
-36
-37                if( mat_row < N && mat_col < N ) {
-38
+13        for( int diagonal = 0; diagonal < 2*BLOCK_SIZE; diagonal++ ) {
+14
+15            int thread_limit = (diagonal < BLOCK_SIZE) ? (diagonal) : (2*BLOCK_SIZE-diagonal);
+16  
+17            // Verify that the diagonal thread index does not exceed the maximum number of elements allowed by the diagonal at this iteration.
+18            if( threadIdx.x <= thread_limit ) {
+10
+20                // Get the position of the thread inside the block.
+21                int pos_in_block_x = threadIdx.x;
+22                int pos_in_block_y = diagonal - pos_in_block_x;
+23  
+24                if( diagonal > BLOCK_SIZE ) {
+25                    pos_in_block_x = BLOCK_SIZE - threadIdx.x - 1;
+26                    pos_in_block_y = diagonal - pos_in_block_x - 1;
+27                }
+28  
+29                // Calculate the positions of the thread inside the matrix.
+30                int mat_row = diagonal_block_row * blockDim.x + pos_in_block_y;
+31                int mat_col = diagonal_block_col * blockDim.x + pos_in_block_x;
+32
+33                if( mat_row < N && mat_col < N ) {
+34
 .
 .				  	  // Same code as the Needleman-Wunsch Algorithm
 .
-67                    // Update the matrix at the correct position
-68                    matrix[  mat_row*N + mat_col ] = max;
-69
-71                }
-72            }
-73
-74            __syncthreads();
+63                    // Update the matrix at the correct position
+64                    matrix[  mat_row*N + mat_col ] = max;
+65
+66                }
+67            }
+68
+69            __syncthreads();
+70
+71        }
+72
+73    }
+74
 75
-76        }
+76    void nw_gpu0(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, unsigned int N) { 
 77
-78    }
+78        unsigned int numThreadsPerBlock = BLOCK_SIZE;
 79
-80
-81    void nw_gpu0(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, unsigned int N) { 
-82
-83        unsigned int numThreadsPerBlock = BLOCK_SIZE;
-84
-85        for(int iter=0; iter < 2* ( (N + BLOCK_SIZE - 1) / BLOCK_SIZE) - 1; iter++) {
-86  
-87            // Configure next run
-88            unsigned int numBlocks = (iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iter + 1) : (2*((N + BLOCK_SIZE - 1) / BLOCK_SIZE) - iter - 1);
-89  
-90            //printf("%d, %d\n", iter, numBlocks);
-91            // Launch kernel
-92            nw_kernel0<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
-93  
-94            cudaDeviceSynchronize();
-95  
-96        }
-97  
-98    }
+80        for(int iter=0; iter < 2* ( (N + BLOCK_SIZE - 1) / BLOCK_SIZE) - 1; iter++) {
+81  
+82            // Configure next run
+83            unsigned int numBlocks = (iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iter + 1) : (2*((N + BLOCK_SIZE - 1) / BLOCK_SIZE) - iter - 1);
+84  
+85            //printf("%d, %d\n", iter, numBlocks);
+86            // Launch kernel
+87            nw_kernel0<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
+88  
+89            cudaDeviceSynchronize();
+90  
+91        }
+92  
+93    }
 ```
 
 #### nw_gpu0:
 
-On line 85 we start a loop that iterates 2*ceil(N/BLOCK_SIZE) - 1 times. The reason we iterate this exact number of times, is that we need 1 kernel call per block diagonal, and
-as it happens to be, an NxN matrix has 2*N-1 reverse diagonals.
+At line 80 we start a loop that iterates 2\*ceil(N/BLOCK_SIZE) - 1 times. The reason we iterate this exact number of times, is that we need 1 kernel call per block diagonal, and
+as it happens to be, an NxN matrix has 2\*N-1 reverse diagonals.
 For example, take the following image, and assume that the block size is 2.
 
 <img src="res/NumDiagonalBlocks.png" alt="Number of diagonal coded by color." width="400">
@@ -246,20 +241,21 @@ As you can probably see that there are 7 different colors. Each color represents
 
 During each iteration we do the following:
 
-1. Calculate the required number of blocks for the current iteration (line 88).
-2. Call the kernel with the correct parameters (line 92).
-3. Call cudaDeviceSynchronize to make sure that the next iteration can start, if and only if, the GPU has finished computing the current iteration (line 94).
+1. Calculate the required number of blocks for the current iteration (line 83).
+2. Call the kernel with the correct parameters (line 87).
+3. Call cudaDeviceSynchronize to make sure that the next iteration can start, if and only if, the GPU has finished computing the current iteration (line 89).
 
-Note: The diagonal size starts decreasing after iteration N, so we adjust for this with the conditional statement on line 88.
+Note: The diagonal size starts decreasing after iteration N, so we adjust for this with the conditional statement on line 83.
 
 In conclusion, the job of `nw_gpu0` is to control and synchronise kernel calls so that the required values by the next diagonal are computed and prepared during the current iteration, slowly building up the ouput matrix block diagonal by block diagonal.
 
 #### nw_kernel0:
 
-The `nw_kernel0` has many aspects that makes a little bit unintuitive.
+The `nw_kernel0` kernel has many aspects that makes it a little bit unintuitive, and that is, that threads and blocks run diagonally to the output matrix.
+This causes the calculation of positions in the matrix a little bit more awakward.
 However, what it essantially does can be broken down into two parts:
 
-1. Calculate the position of current block in the matrix (line 4 - 15):
+1. Calculate the position of the executing block in the output matrix (line 4 - 11):
 
 The first bit of confusing code, is at line 5 and 6.
 
@@ -268,19 +264,27 @@ However, the only information that we know about the currently executing block i
 
 From this information, we can extract the following:
 
-We know that the diagonal we are speaking of is a revesed diagonal. We can, therefore, represent the different positions that this diagonal pass through using the following formula: `x + y = iteration`. Since we know that the index of blocks in the grid map directly to its y-position in the grid, we can determine the x-position of the block in the ouput matrix using the following formula: `x = iteration - y`
+We know that the diagonal we are speaking of is a revesed diagonal. We can, therefore, represent the different positions that this diagonal pass through using the following formula: `x + y = iteration`. Since we know that the index of blocks in the grid directly map directly its y-position in the grid, we can determine the x-position of the block in the ouput matrix using the following formula: `x = iteration - y`
 
 Note: What helped me grasp how we should find the position of the block in the matrix was to relate it to linear algebra. The explanation above is equivalent to a linear transformation of a 1D vector in the grid into a 2D vector in the matrix.
 
 <img src="res/LinearTransform.png" alt="Linear Transform Example at Diagonal 2" width="600">
 
-The second explanation, is that the value of x and y in the matrix are related to the diagonal the current block is on by the following formula: `x + y = diagonal`, therefore, by setting the x-coordinate with the value of the block index in the grid, we can calculate the effective position of y in the matrix using the following formula `y = diag - x`. Although this explamation seems simpler to understand, we have to point out that both the first and second explanation express the same thing.
+Then at line 8, we verify that the diagonal based on which we are calculating the block position in the ouput matrix, does not exceed N. If it does then the calculation the position of the block changes a little bit as the size of the diagonals are now decreasing.
 
-Since we are executing based on a block diagonal given by the iteration number, we can actually deduce the coordinates of our block by knowing the following:
+2. Loop over each diagonal in the block (line 13-71):
 
- 
-3. Loop through the values in this block and calculate value of the cell in the exact same way as we did for the CPU (line 17-72):
+We start looping over all the reversed diagonal within the currently executing block. 
 
+We calculate an upper bound for the thread index for each iteration of the loop (line 15) and then only let threads passthorugh if they are within this upper-bound (line 18).
+
+In the same that we calculated the position of x and y for the block in the matrix, we calculate the position of x and y of threads within this block based on the diagonals (line 21 & 22). We also do a verfication for the diagonal size as we did for the blocks (line 24), and update the positions of the threads accordingly.
+
+Finally, we can calculate the threads x and coordinates within the ouput matrix (line 30 & 31).
+
+From there, it is smooth sailing, we first do a boundary check on the coordinates we obtained to make sure that threads beyond N do not execute (line 33). Then from line 34 to 64, we apply the exact same computational steps as we did for the CPU, and finally save the value obtained in the ouput matrix.
+
+Note: At line 69, notice the use of `__syncthread()` statement to make sure that all the necessary values are calculated before starting the next iteration.
 
 ## Complexity Analysis:
 
