@@ -156,10 +156,11 @@ In the end we save the result of the previous operation into the output array (l
 ### The Needleman-Wunsch Algorithm on the GPU:
 
 As you can see, the Needleman-Wunsch Algorithm on the GPU presents itself, in two parts. 
-First, there is a driver function `nw_gpu0` on the CPU that controls, and second, you have the kernel that does the matrix processing required by the problem.
+First, there is a driver function `nw_gpu0` that runs on the CPU that controls, and then, there is `nw_kernel` that runs on the gpu.
+As 
 
 ```C++
- 1  __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
+ 1  __global__ void nw_kernel0(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
  2
  3
  4        // Transform 1D Grid Coordinates into 2D Diagonal Coordinates.
@@ -224,7 +225,7 @@ First, there is a driver function `nw_gpu0` on the CPU that controls, and second
 89  
 90            //printf("%d, %d\n", iter, numBlocks);
 91            // Launch kernel
-92            nw_kernel<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
+92            nw_kernel0<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
 93  
 94            cudaDeviceSynchronize();
 95  
@@ -232,6 +233,16 @@ First, there is a driver function `nw_gpu0` on the CPU that controls, and second
 97  
 98    }
 ```
+
+#### nw_gpu0:
+
+On line 85 we start a loop that iterates 2*ceil(N/BLOCK_SIZE) - 1 times. The reason we iterate this exact number of times, is that we need 1 kernel call per block diagonal.
+For example, take the following image, and assume that the block size is 2.
+
+
+
+#### nw_kernel:
+
 
 ## Complexity Analysis:
 
