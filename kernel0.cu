@@ -16,10 +16,6 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
         diagonal_block_col = iteration_number - diagonal_block_row;
     }
 
-    // Get the effective coordinates of the block int the matrix.
-    int block_row = diagonal_block_row * blockDim.x;
-    int block_col = diagonal_block_col * blockDim.x;
-
     for( int diagonal = 0; diagonal < 2*BLOCK_SIZE; diagonal++ ) {
 
         int thread_limit = (diagonal < BLOCK_SIZE) ? (diagonal) : (2*BLOCK_SIZE-diagonal);
@@ -37,8 +33,8 @@ __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* m
             }
 
             // Calculate the positions of the thread inside the matrix.
-            int mat_row = block_row + pos_in_block_y;
-            int mat_col = block_col + pos_in_block_x;
+            int mat_row = diagonal_block_row * blockDim.x + pos_in_block_y;
+            int mat_col = diagonal_block_col * blockDim.x + pos_in_block_x;
             
             if( mat_row < N && mat_col < N ) {
 
