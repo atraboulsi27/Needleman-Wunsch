@@ -278,7 +278,7 @@ We start looping over all the reversed diagonal within the currently executing b
 
 We calculate an upper bound for the thread index for each iteration of the loop (line 15) and then only let threads passthorugh if they are within this upper-bound (line 18).
 
-In the same that we calculated the position of x and y for the block in the matrix, we calculate the position x and y of threads within this block based on the diagonals (line 21 & 22). We also do a verfication for the diagonal size as we did for the blocks (line 24), and update the positions of the threads accordingly.
+In the same way that we calculated the position of x and y for the block in the matrix, we calculate the position x and y of threads within this block based on the diagonals (line 21 & 22). We also do a verfication for the diagonal size as we did for the blocks (line 24), and update the positions of the threads accordingly.
 
 Finally, we can calculate the threads x and y coordinates within the ouput matrix (line 30 & 31).
 
@@ -295,3 +295,10 @@ From the algorithm analysis section we can determine the complexity of the matri
 <img src="res/nw-cpu-plot.png" alt="A run of the Needleman-Wunsch algorithm on the cpu" width="600">
 
 This benchmark was run on an intel i9-9900K using 32GB of RAM running an Ubuntu 20.04 Operating System. The input sets are values ranging from 1-9 (step 1), 10-100 (step 10), 100-1,000 (step 100), 1,000-10,000 (step 1,000), and 10,000-50,000 (step 5,000). A script called nw-loop.sh was included in the repo to run the same benchmark on your machine. As a note, running this algorithm on my machine using the code provided in main.cu with an input size of more than 60,000 produces a segmentation fault. As expected, the general shape of the curve produced by the benchmark  is quadratic, matching the time complexity established.
+
+
+### CPU vs. Kernel0:
+
+<img src="res/nw-cpu-0.png" alt="A run of the Needleman-Wunsch algorithm on the cpu and gpu" width="600">
+
+The following benchmark (the same one as before) was run on an intel i9-9900K using 32GB of RAM running an Ubuntu 20.04 Operating System with an NVidea RTX 2080 with 8GB of RAM. As you can see we got a very good improvement on the runtime of the algorithm. We are consistently getting a 5 to 7 times improvement in runtime when running with larger input values. Note that the dip you observe after the input of size 40,000 is due to memory limitations on the GPU. On my system, my idle GPU consumed about 1,400 MB of RAM for various function like XORG. An NxN integer martix of size 40,000 consumes `4 * 40,000^2 / 1M = 6,400 MB` which explains why we could not run on an input size greater than 40,000. We expect to see even more improvements in the next milestones.
