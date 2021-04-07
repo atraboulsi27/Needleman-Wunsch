@@ -78,6 +78,8 @@ However, in our case we are not interested in the traceback algorithm as we will
 
 ## Parallelization Attempts:
 
+### Attempt 1:
+
 Our first parralelisation attempt consists of assigning threads whithin blocks in a diagonal manner. The reason we chose this approach, is that given a position to compute (i, j), we cannot start the computation of this cell berfore computing the values of the neighbors (i-1, j-1), (i-1, j), (i, j-1). If we were to go with the traditional approach of assigning threads to the matrix indices, we would end up with the problem of computing cells that do not have computed neighbors. However, assigning threads diagonally, we notice that every cell has its computational requirements ready before its computation. As a general guideline of how we plan to execute this method, please have a look at the following diagram:
 
 <img src="res/DiagonalThreadsIteration1.png" alt="GPU ALG 1" width="600">
@@ -93,6 +95,10 @@ However, the problem does not end here. Given the previous method of computing b
 In this example consider this matrix as the output matrix, and not as a block. As you can see, the green blocks require values that are produced by the yellow block. However, if we run the kernel on all blocks at the same time, there will be a racing condition in the equivalent positions of (-2, -1), (-1, -2) & (-2, -2), potentially rendering the values in the green blocks completely wrong. As such, we must synchronize, one way or another the execution of the blocks. To do this, as a first attempt, we choose to implement this synchronisation using the CPU. After executing a number of specified blocks, the GPU will have updated the global memory output array, it is at this point that the CPU will order a new execution of the kernel on a specified input set.
 
 In summary, we have proposed a parallelisation plan for the matrix filling part of the Needleman-Wunsch Algorithm. It uses diagonal threads to compute the scores of indivual cells within blocks, and syncronize between each other, with help of the CPU to produce the correct output matrix.
+
+### Attempt 2:
+
+We think that the last attempt was very successful. At some point during, development, we realised that without intending to do so, we had already applied a partial optimisation. We ran the code using 2D blocks applying a kind of thread coarsening along with some memory coalescing (We're saying partial as we have not studied the behavior of using smaller or larger blocks). However, we think there is a lot of work left. We can extract even more performance from this problem. For now, we will concentrate on adding shared memory to the kernel as we think that it will bring the greatest benefit. Using we can actually achieve readings and writings to memory in coalessed way. Right now, we may sometimes be writing to the ouput matrix in a coalessed way, but this behavior is very not well defined and predicted.
 
 ## Code Description:
 
