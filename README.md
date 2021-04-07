@@ -153,6 +153,86 @@ Finally, we need to evaluate the best possibility for the alignment at this posi
 
 In the end we save the result of the previous operation into the output array (line 15).
 
+### The Needleman-Wunsch Algorithm on the GPU:
+
+As you can see, the Needleman-Wunsch Algorithm on the GPU presents itself, in two parts. 
+First, there is a driver function `nw_gpu0` on the CPU that controls, and second, you have the kernel that does the matrix processing required by the problem.
+
+```C++
+ 1  __global__ void nw_kernel(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
+ 2
+ 3
+ 4        // Transform 1D Grid Coordinates into 2D Diagonal Coordinates.
+ 5        int diagonal_block_row = blockIdx.x;
+ 6        int diagonal_block_col = iteration_number - diagonal_block_row;
+ 7  
+ 8        if( iteration_number > gridDim.x) {
+ 9            diagonal_block_row = ( (N + BLOCK_SIZE - 1)/BLOCK_SIZE ) - blockIdx.x - 1;
+10            diagonal_block_col = iteration_number - diagonal_block_row;
+11        }
+12  
+13        // Get the effective coordinates of the block int the matrix.
+14        int block_row = diagonal_block_row * blockDim.x;
+15        int block_col = diagonal_block_col * blockDim.x;
+16 
+17        for( int diagonal = 0; diagonal < 2*BLOCK_SIZE; diagonal++ ) {
+18
+19            int thread_limit = (diagonal < BLOCK_SIZE) ? (diagonal) : (2*BLOCK_SIZE-diagonal);
+20  
+21            // Verify that the diagonal thread index does not exceed the maximum number of elements allowed by the diagonal at this iteration.
+22            if( threadIdx.x <= thread_limit ) {
+23
+24                // Get the position of the thread inside the block.
+25                int pos_in_block_x = threadIdx.x;
+26                int pos_in_block_y = diagonal - pos_in_block_x;
+27  
+28                if( diagonal > BLOCK_SIZE ) {
+29                    pos_in_block_x = BLOCK_SIZE - threadIdx.x - 1;
+30                    pos_in_block_y = diagonal - pos_in_block_x - 1;
+31                }
+32  
+33                // Calculate the positions of the thread inside the matrix.
+34                int mat_row = block_row + pos_in_block_y;
+35                int mat_col = block_col + pos_in_block_x;
+36
+37                if( mat_row < N && mat_col < N ) {
+38
+.
+.				  	  // Same code as the Needleman-Wunsch Algorithm
+.
+67                    // Update the matrix at the correct position
+68                    matrix[  mat_row*N + mat_col ] = max;
+69
+71                }
+72            }
+73
+74            __syncthreads();
+75
+76        }
+77
+78    }
+79
+80
+81    void nw_gpu0(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, unsigned int N) { 
+82
+83        unsigned int numThreadsPerBlock = BLOCK_SIZE;
+84
+85        for(int iter=0; iter < 2* ( (N + BLOCK_SIZE - 1) / BLOCK_SIZE) - 1; iter++) {
+86  
+87            // Configure next run
+88            unsigned int numBlocks = (iter < (N + BLOCK_SIZE - 1) / BLOCK_SIZE) ? (iter + 1) : (2*((N + BLOCK_SIZE - 1) / BLOCK_SIZE) - iter - 1);
+89  
+90            //printf("%d, %d\n", iter, numBlocks);
+91            // Launch kernel
+92            nw_kernel<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
+93  
+94            cudaDeviceSynchronize();
+95  
+96        }
+97  
+98    }
+```
+
 ## Complexity Analysis:
 
 ### Needleman-Wunsch Algorithm on the CPU:
