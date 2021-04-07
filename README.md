@@ -280,7 +280,7 @@ We calculate an upper bound for the thread index for each iteration of the loop 
 
 In the same that we calculated the position of x and y for the block in the matrix, we calculate the position x and y of threads within this block based on the diagonals (line 21 & 22). We also do a verfication for the diagonal size as we did for the blocks (line 24), and update the positions of the threads accordingly.
 
-Finally, we can calculate the threads x and coordinates within the ouput matrix (line 30 & 31).
+Finally, we can calculate the threads x and y coordinates within the ouput matrix (line 30 & 31).
 
 From there, it is smooth sailing, we first do a boundary check on the coordinates we obtained to make sure that threads beyond N do not execute (line 33). Then from line 34 to 64, we apply the exact same computational steps as we did for the CPU, and finally save the value obtained in the ouput matrix.
 
