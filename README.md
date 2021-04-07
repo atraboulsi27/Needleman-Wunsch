@@ -236,12 +236,50 @@ As
 
 #### nw_gpu0:
 
-On line 85 we start a loop that iterates 2*ceil(N/BLOCK_SIZE) - 1 times. The reason we iterate this exact number of times, is that we need 1 kernel call per block diagonal.
+On line 85 we start a loop that iterates 2*ceil(N/BLOCK_SIZE) - 1 times. The reason we iterate this exact number of times, is that we need 1 kernel call per block diagonal, and
+as it happens to be, an NxN matrix has 2*N-1 reverse diagonals.
 For example, take the following image, and assume that the block size is 2.
 
+<img src="res/NumDiagonalBlocks.png" alt="Number of diagonal coded by color." width="400">
 
+As you can probably see that there are 7 different colors. Each color represents one block diagonal that we need to iterate through.
 
-#### nw_kernel:
+During each iteration we do the following:
+
+1. Calculate the required number of blocks for the current iteration (line 88).
+2. Call the kernel with the correct parameters (line 92).
+3. Call cudaDeviceSynchronize to make sure that the next iteration can start, if and only if, the GPU has finished computing the current iteration (line 94).
+
+Note: The diagonal size starts decreasing after iteration N, so we adjust for this with the conditional statement on line 88.
+
+In conclusion, the job of `nw_gpu0` is to control and synchronise kernel calls so that the required values by the next diagonal are computed and prepared during the current iteration, slowly building up the ouput matrix block diagonal by block diagonal.
+
+#### nw_kernel0:
+
+The `nw_kernel0` has many aspects that makes a little bit unintuitive.
+However, what it essantially does can be broken down into two parts:
+
+1. Calculate the position of current block in the matrix (line 4 - 15):
+
+The first bit of confusing code, is at line 5 and 6.
+
+What we are trying to do is to find the x-coordinate, and the y-coordinate of the executing block in the matrix.
+However, the only information that we know about the currently executing block is its position in the grid (the grid index), and the iteration it is a part of.
+
+From this information, we can extract the following:
+
+We know that the diagonal we are speaking of is a revesed diagonal. We can, therefore, represent the different positions that this diagonal pass through using the following formula: `x + y = iteration`. Since we know that the index of blocks in the grid map directly to its y-position in the grid, we can determine the x-position of the block in the ouput matrix using the following formula: `x = iteration - y`
+
+Note: What helped me grasp how we should find the position of the block in the matrix was to relate it to linear algebra. The explanation above is equivalent to a linear transformation of a 1D vector in the grid into a 2D vector in the matrix.
+
+<img src="res/LinearTransform.png" alt="Linear Transform Example at Diagonal 2" width="600">
+
+The second explanation, is that the value of x and y in the matrix are related to the diagonal the current block is on by the following formula: `x + y = diagonal`, therefore, by setting the x-coordinate with the value of the block index in the grid, we can calculate the effective position of y in the matrix using the following formula `y = diag - x`. Although this explamation seems simpler to understand, we have to point out that both the first and second explanation express the same thing.
+
+Since we are executing based on a block diagonal given by the iteration number, we can actually deduce the coordinates of our block by knowing the following:
+
+ 
+3. Loop through the values in this block and calculate value of the cell in the exact same way as we did for the CPU (line 17-72):
 
 
 ## Complexity Analysis:
