@@ -26,19 +26,16 @@ __global__ void nw_kernel1(unsigned char* reference, unsigned char* query, int* 
         diagonal_block_col = iteration_number - diagonal_block_row;
     }
 
-
-    // THIS IS NOT LOADING CORRECTLY
-    
     __shared__ int matrix_s[IN_TILE_DIM][IN_TILE_DIM];
 
     // Load elements from the previous column (Non-Coalessed)
-    if(diagonal_block_col != 0 && threadIdx.x > 0) {
-        matrix_s[threadIdx.x][0] = matrix[(diagonal_block_row*OUT_TILE_DIM + threadIdx.x)*N + (diagonal_block_col * OUT_TILE_DIM - 1)];
+    if(diagonal_block_col != 0 && threadIdx.x < OUT_TILE_DIM) {
+        matrix_s[threadIdx.x+1][0] = matrix[(diagonal_block_row*OUT_TILE_DIM + threadIdx.x)*N + (diagonal_block_col * OUT_TILE_DIM-1)];
     }
 
     // Load elements from the previous row (Coalessed)
-    if(diagonal_block_row != 0 && threadIdx.x > 0) {
-        matrix_s[0][threadIdx.x] = matrix[(diagonal_block_row*OUT_TILE_DIM - 1)*N + (diagonal_block_col * OUT_TILE_DIM + threadIdx.x)];
+    if(diagonal_block_row != 0 && threadIdx.x < OUT_TILE_DIM) {
+        matrix_s[0][threadIdx.x+1] = matrix[(diagonal_block_row*OUT_TILE_DIM - 1)*N + (diagonal_block_col * OUT_TILE_DIM + threadIdx.x)];
     }
 
     if( threadIdx.x == 0 && diagonal_block_col > 0 && diagonal_block_row > 0 ) {
@@ -47,21 +44,6 @@ __global__ void nw_kernel1(unsigned char* reference, unsigned char* query, int* 
 
 
     __syncthreads();
-
-    
-    if( blockIdx.x == 0 && threadIdx.x == 0 ) {
-
-        printf("row: %d, col: %d\n", diagonal_block_row, diagonal_block_col );
-
-        printf("\n");
-        for(int i=0; i<32; i++) {
-            for(int j=0; j<32; j++) {
-                printf("%d, ", matrix_s[i][j]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
 
     for( int diagonal = 0; diagonal < 2*OUT_TILE_DIM; diagonal++ ) {
 
@@ -113,15 +95,6 @@ __global__ void nw_kernel1(unsigned char* reference, unsigned char* query, int* 
                 // Update the matrix at the correct position
                 matrix_s[pos_y + 1][pos_x + 1] = max;
             
-                // if (diagonal == 31) {
-                //     printf("%d\n",threadIdx.x);
-                // }
-
-                // printf("top: %d, left: %d, topleft: %d, max: %d", top, left, topleft, max);
-            
-                // if (diagonal == 31) {
-                //     printf("thread: %d, x: %d, y: %d\n", threadIdx.x, pos_x, pos_y);
-                // }
             }
         }
 
@@ -129,37 +102,12 @@ __global__ void nw_kernel1(unsigned char* reference, unsigned char* query, int* 
 
     }
 
-    // if(blockIdx.x == 0 && threadIdx.x == 0) {
-    //     printf("\n");
-    //     for(int i=0; i<32; i++) {
-    //         for(int j=0; j<32; j++) {
-    //             printf("%d, ", matrix_s[i][j]);
-    //         }
-    //         printf("\n");
-    //     }
-    //     printf("\n");
-    // }
-    
     // Update the output matrix at the correct positions (Writes are coalsced).
-    if( diagonal_block_row * OUT_TILE_DIM + threadIdx.x < N && diagonal_block_col * OUT_TILE_DIM + threadIdx.x < N && threadIdx.x < OUT_TILE_DIM && threadIdx.x < OUT_TILE_DIM ) {
-        for(int i=0; i<OUT_TILE_DIM; i++) {
+    for(int i=0; i<OUT_TILE_DIM; i++) {
+        if( diagonal_block_row * OUT_TILE_DIM + i < N && diagonal_block_col * OUT_TILE_DIM + threadIdx.x < N && threadIdx.x < OUT_TILE_DIM ) {
             matrix[ (diagonal_block_row*OUT_TILE_DIM + i)*N + (diagonal_block_col * OUT_TILE_DIM) + threadIdx.x ] = matrix_s[i+1][threadIdx.x+1];
         }
     }
-
-    if ( threadIdx.x == 0) {
-        // printf("\n");
-        // for(int i=0; i<62; i++) {
-        //     for(int j=0; j<62; j++) {
-        //         printf("%d, ", matrix[i*N +j]);
-        //     }
-        //     printf("\n");
-        // }
-        // printf("\n");   
-        // printf("x: %d, y:%d\n", diagonal_block_col, diagonal_block_row);
-    }
-    
-    
 
 }
 
@@ -173,7 +121,7 @@ void nw_gpu1(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, 
         // Configure next run
         unsigned int numBlocks = (iter < (N + OUT_TILE_DIM - 1) / OUT_TILE_DIM) ? (iter + 1) : (2*((N + OUT_TILE_DIM - 1) / OUT_TILE_DIM) - iter - 1);
       
-        printf("%d, %d\n", iter, numBlocks);
+        // printf("%d, %d\n", iter, numBlocks);
         // Launch kernel
         nw_kernel1<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
         
