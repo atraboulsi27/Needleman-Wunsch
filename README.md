@@ -80,8 +80,6 @@ However, in our case we are not interested in the traceback algorithm as we will
 
 ### Attempt 1:
 
-#### Plan:
-
 Our first parralelisation attempt consists of assigning threads whithin blocks in a diagonal manner. The reason we chose this approach, is that given a position to compute (i, j), we cannot start the computation of this cell berfore computing the values of the neighbors (i-1, j-1), (i-1, j), (i, j-1). If we were to go with the traditional approach of assigning threads to the matrix indices, we would end up with the problem of computing cells that do not have computed neighbors. However, assigning threads diagonally, we notice that every cell has its computational requirements ready before its computation. As a general guideline of how we plan to execute this method, please have a look at the following diagram:
 
 <img src="res/DiagonalThreadsIteration1.png" alt="GPU ALG 1" width="600">
@@ -100,7 +98,7 @@ In summary, we have proposed a parallelisation plan for the matrix filling part 
 
 We think that this attempt was very successful. At some point during, development, we realised that without intending to do so, we had already applied a partial optimisation. We ran the code using 2D blocks applying a kind of thread coarsening along with some memory coalescing (We're saying partial as we have not studied the behavior of using smaller or larger blocks). However, we think there is a lot of work left. We can extract even more performance from this problem. For now, we will concentrate on adding shared memory to the kernel as we think that it will bring the greatest benefit. Using it, we can actually achieve readings and writings to memory in coalesced way. Furthuremore, we may benefit from shared memory even more by effectively having full memory reuse, on the three accesses that we have on each thread. Right now, we need to go to back to global memory each time we access an element, and our reads are not necessarily coalesced.
 
-#### Attempt 2:
+### Attempt 2:
 
 As mentioned in the previous iteration, we had applied some kind of optimization without realizing it. It consisted of a kind of thread coarsening where we would group diagonals into blocks and iterate over them in the same block. This time, we had decided to implement an optimization related to shared memory. Instead of letting each thread load the value it needs from global memory, we will first load the values into a 2D array in shared memory. Using this technique, we are able to alleviate inefficiencies in two ways: 
 
