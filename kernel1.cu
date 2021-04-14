@@ -21,7 +21,7 @@ __global__ void nw_kernel1(unsigned char* reference, unsigned char* query, int* 
     int diagonal_block_row = blockIdx.x;
     int diagonal_block_col = iteration_number - diagonal_block_row;
 
-    if( iteration_number > gridDim.x) {
+    if( iteration_number >= ( (N + OUT_TILE_DIM - 1)/OUT_TILE_DIM )) {
         diagonal_block_row = ( (N + OUT_TILE_DIM - 1)/OUT_TILE_DIM ) - blockIdx.x - 1;
         diagonal_block_col = iteration_number - diagonal_block_row;
     }
@@ -29,16 +29,16 @@ __global__ void nw_kernel1(unsigned char* reference, unsigned char* query, int* 
     __shared__ int matrix_s[IN_TILE_DIM][IN_TILE_DIM];
 
     // Load elements from the previous column (Non-Coalessed)
-    if(diagonal_block_col != 0 && threadIdx.x < OUT_TILE_DIM) {
+    if(diagonal_block_col != 0 && threadIdx.x < OUT_TILE_DIM && diagonal_block_row * OUT_TILE_DIM + threadIdx.x < N) {
         matrix_s[threadIdx.x+1][0] = matrix[(diagonal_block_row*OUT_TILE_DIM + threadIdx.x)*N + (diagonal_block_col * OUT_TILE_DIM-1)];
     }
 
     // Load elements from the previous row (Coalessed)
-    if(diagonal_block_row != 0 && threadIdx.x < OUT_TILE_DIM) {
+    if(diagonal_block_row != 0 && threadIdx.x < OUT_TILE_DIM && diagonal_block_col * OUT_TILE_DIM + threadIdx.x < N) {
         matrix_s[0][threadIdx.x+1] = matrix[(diagonal_block_row*OUT_TILE_DIM - 1)*N + (diagonal_block_col * OUT_TILE_DIM + threadIdx.x)];
     }
 
-    if( threadIdx.x == 0 && diagonal_block_col > 0 && diagonal_block_row > 0 ) {
+    if( threadIdx.x == 0 && diagonal_block_col > 0 && diagonal_block_row > 0) {
         matrix_s[0][0] = matrix[(diagonal_block_row * OUT_TILE_DIM - 1)*N + (diagonal_block_col * OUT_TILE_DIM - 1)];
     }
 
@@ -120,12 +120,16 @@ void nw_gpu1(unsigned char* reference_d, unsigned char* query_d, int* matrix_d, 
 
         // Configure next run
         unsigned int numBlocks = (iter < (N + OUT_TILE_DIM - 1) / OUT_TILE_DIM) ? (iter + 1) : (2*((N + OUT_TILE_DIM - 1) / OUT_TILE_DIM) - iter - 1);
-      
+
         // printf("%d, %d\n", iter, numBlocks);
         // Launch kernel
         nw_kernel1<<<numBlocks, numThreadsPerBlock>>>(reference_d, query_d, matrix_d, N, iter);
         
         cudaDeviceSynchronize();
+
+        // if ( cudaGetLastError() != 0 ) {
+        //     printf( "iteration: %d, blocks: %d, error: %d\n", iter, numBlocks, cudaGetLastError(), cudaGetErrorString);
+        // }
 
     }
 
