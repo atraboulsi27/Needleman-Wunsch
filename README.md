@@ -80,6 +80,8 @@ However, in our case we are not interested in the traceback algorithm as we will
 
 ### Attempt 1:
 
+#### Plan:
+
 Our first parralelisation attempt consists of assigning threads whithin blocks in a diagonal manner. The reason we chose this approach, is that given a position to compute (i, j), we cannot start the computation of this cell berfore computing the values of the neighbors (i-1, j-1), (i-1, j), (i, j-1). If we were to go with the traditional approach of assigning threads to the matrix indices, we would end up with the problem of computing cells that do not have computed neighbors. However, assigning threads diagonally, we notice that every cell has its computational requirements ready before its computation. As a general guideline of how we plan to execute this method, please have a look at the following diagram:
 
 <img src="res/DiagonalThreadsIteration1.png" alt="GPU ALG 1" width="600">
@@ -96,9 +98,21 @@ In this example consider this matrix as the output matrix, and not as a block. A
 
 In summary, we have proposed a parallelisation plan for the matrix filling part of the Needleman-Wunsch Algorithm. It uses diagonal threads to compute the scores of indivual cells within blocks, and syncronize between each other, with help of the CPU to produce the correct output matrix.
 
-### Attempt 2:
+We think that this attempt was very successful. At some point during, development, we realised that without intending to do so, we had already applied a partial optimisation. We ran the code using 2D blocks applying a kind of thread coarsening along with some memory coalescing (We're saying partial as we have not studied the behavior of using smaller or larger blocks). However, we think there is a lot of work left. We can extract even more performance from this problem. For now, we will concentrate on adding shared memory to the kernel as we think that it will bring the greatest benefit. Using it, we can actually achieve readings and writings to memory in coalesced way. Furthuremore, we may benefit from shared memory even more by effectively having full memory reuse, on the three accesses that we have on each thread. Right now, we need to go to back to global memory each time we access an element, and our reads are not necessarily coalesced.
 
-We think that the last attempt was very successful. At some point during, development, we realised that without intending to do so, we had already applied a partial optimisation. We ran the code using 2D blocks applying a kind of thread coarsening along with some memory coalescing (We're saying partial as we have not studied the behavior of using smaller or larger blocks). However, we think there is a lot of work left. We can extract even more performance from this problem. For now, we will concentrate on adding shared memory to the kernel as we think that it will bring the greatest benefit. Using it, we can actually achieve readings and writings to memory in coalesced way. Furthuremore, we may benefit from shared memory even more by effectively having full memory reuse, on the three accesses that we have on each thread. Right now, we need to go to back to global memory each time we access an element, and our reads are not necessarily coalesced.
+#### Attempt 2:
+
+As mentioned in the previous iteration, we had applied some kind of optimization without realizing it. It consisted of a kind of thread coarsening where we would group diagonals into blocks and iterate over them in the same block. This time, we had decided to implement an optimization related to shared memory. Instead of letting each thread load the value it needs from global memory, we will first load the values into a 2D array in shared memory. Using this technique, we are able to alleviate inefficiencies in two ways: 
+
+The primary reason we decided to implement this optimization, is that we will be able to achieve a higher memory reuse. Previously, we read from global memory three times, once to get a value from the top, once to get a value from the left, and once to get a value from the top-left. Each of those accesses required us to go back to global memory in order to read a value that was already processed. Now, we are writing the result of each of our operations back to the shared memory array in the hope of reusing each of the values three times.
+Second, we are now able to read and write to global memory in a coalesced way. Indeed, using a shared memory array, we can now load values row by row, taking advantage of memory bursts in order to perform IO operations much faster.
+To perform this optimization, we had to reduce our block size from 1024 to 32 as the maximum amount of shared memory on the GPU being used is 64 KB (NVIDIA RTX 2080). However, this change turned out to be a good thing as even without implementing the algorithm, we noticed a performance improvement using a lower amount of thread coarsening.
+
+For the next iteration, we are finally planning to implement thread coarsening as an optimization. Clearly, it has played a role in our previous implementations. However, we are now ready to study its behavior in a more defined way. To achieve this we will increase the block size we are processing without increasing the number of threads we are using. The problem we will therefore face, is how to process process a block where diagonals within a block are not of an equal size as one side of this block. To do this, we will break up diagonals into segments of the same-length and iterate over them achieving a higher. Of course, we will have to find a way to reuse the shared memory matrix for different iterations on the segment.
+
+Also, we have noticed that we are not maximizing our occupancy, and will therefore try to address this problem in the next iteration. One potential solution, is to launch a grid with many more threads than a single diagonal can support. However, we only use the extra-threads when we are finished processing the previous diagonal segment.
+
+<img src="res/ComplicatedProcessingPattern.png" alt="Possible implementation pattern" width="800">
 
 ## Code Description:
 
@@ -292,7 +306,9 @@ From there, it is smooth sailing, we first do a boundary check on the coordinate
 
 Note: At line 69, notice the use of `__syncthread()` statement to make sure that all the necessary values are calculated before starting the next iteration.
 
-### kernel1:
+
+### The Needleman-Wunsch Algorithm with Shared Memory:
+
 ```C++
  1    #define IN_TILE_DIM 32
  2    #define OUT_TILE_DIM ( (IN_TILE_DIM) - 1 )
@@ -395,6 +411,17 @@ Note: At line 69, notice the use of `__syncthread()` statement to make sure that
 99    }
 ```
 
+The code you see above does not do a lot changes compared to the previous iteration. The only differences can be found at lines 16-30, 59-65, 83, and 93-97.
+
+From lines 16 to 30, we first declare the shared memory array. We then load the values from edge of the previous iteration.
+
+From lines 59 to 65, the only difference is that we are loading and computing the top, left, and top-left values from shared memory instead of global memory.
+
+On line 83, we write the result of the nw comparison in the shared memory array instead of global memory.
+
+Finally, from lines 92 to 97, we read the results of the computation in the shared memory, in order to write them to global memory.
+
+
 ## Complexity Analysis:
 
 ### Needleman-Wunsch Algorithm on the CPU:
@@ -411,3 +438,13 @@ This benchmark was run on an intel i9-9900K using 32GB of RAM running an Ubuntu 
 <img src="res/nw-cpu-0.png" alt="A run of the Needleman-Wunsch algorithm on the cpu and gpu" width="600">
 
 The following benchmark (the same one as before) was run on an intel i9-9900K using 32GB of RAM running an Ubuntu 20.04 Operating System with an NVidea RTX 2080 with 8GB of RAM. As you can see we got a very good improvement on the runtime of the algorithm. We are consistently getting a 5 to 7 times improvement in runtime when running with larger input values. Note that the dip you observe after the input of size 40,000 is due to memory limitations on the GPU. On my system, my idle GPU consumed about 1,400 MB of RAM for various function like XORG. An NxN integer martix of size 40,000 consumes `4 * 40,000^2 / 1M = 6,400 MB` which explains why we could not run on an input size greater than 40,000. We expect to see even more improvements in the next milestones.
+
+### CPU vs. Kernel0 vs. Kernel1:
+
+<img src="res/nw-plot-kernel1.png" alt="A run of the Needleman-Wunsch algorithm on the cpu and gpu" width="600">
+
+The following benchmark (the same one as before) was run on an Intel i9-9900K using 32GB of RAM running an Ubuntu 20.04 Operating System with an NVIDIA RTX 2080 with 8GB of RAM. A you can see, the runtime of the Needleman-Wunsch Algorithm using a shared memory optimisation is much better compared even to out first parallel implementation. At around an input size of 40,000, we are approximately getting a 27 times improvement compared the CPU implementation, and around a 7 times improvement on kernel0. 
+
+There is a clear trend between all the implementations. As mentioned previously, the CPU implementation shows a clear quadratic trend. This is also the case for the two kernel implementations, however at a much slower rate. We have to keep in mind that the fact that  kernel 1 appears to evolve linearly is only an illusion created by the scale used for the y dimension.  If we had a much larger amount of GPU memory, we could have shown a much better better picture of how the trends evolve at higher input values.
+
+
