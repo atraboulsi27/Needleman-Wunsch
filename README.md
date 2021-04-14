@@ -292,6 +292,109 @@ From there, it is smooth sailing, we first do a boundary check on the coordinate
 
 Note: At line 69, notice the use of `__syncthread()` statement to make sure that all the necessary values are calculated before starting the next iteration.
 
+### kernel1:
+```C++
+ 1    #define IN_TILE_DIM 32
+ 2    #define OUT_TILE_DIM ( (IN_TILE_DIM) - 1 )
+ 3    
+ 4    __global__ void nw_kernel1(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
+ 5    
+ 6    
+ 7       // Transform 1D Grid Coordinates into 2D Diagonal Coordinates.
+ 8        int diagonal_block_row = blockIdx.x;
+ 9        int diagonal_block_col = iteration_number - diagonal_block_row;
+10    
+11        if( iteration_number >= ( (N + OUT_TILE_DIM - 1)/OUT_TILE_DIM )) {
+12            diagonal_block_row = ( (N + OUT_TILE_DIM - 1)/OUT_TILE_DIM ) - blockIdx.x - 1;
+13            diagonal_block_col = iteration_number - diagonal_block_row;
+14        }
+15    
+16        __shared__ int matrix_s[IN_TILE_DIM][IN_TILE_DIM];
+17    
+18        // Load elements from the previous column (Non-Coalessed)
+19        if(diagonal_block_col != 0 && threadIdx.x < OUT_TILE_DIM && diagonal_block_row * OUT_TILE_DIM + threadIdx.x < N) {
+20            matrix_s[threadIdx.x+1][0] = matrix[(diagonal_block_row*OUT_TILE_DIM + threadIdx.x)*N + (diagonal_block_col * OUT_TILE_DIM-1)];
+21        }
+22    
+23        // Load elements from the previous row (Coalessed)
+24        if(diagonal_block_row != 0 && threadIdx.x < OUT_TILE_DIM && diagonal_block_col * OUT_TILE_DIM + threadIdx.x < N) {
+25            matrix_s[0][threadIdx.x+1] = matrix[(diagonal_block_row*OUT_TILE_DIM - 1)*N + (diagonal_block_col * OUT_TILE_DIM + threadIdx.x)];
+26        }
+27    
+28        if( threadIdx.x == 0 && diagonal_block_col > 0 && diagonal_block_row > 0) {
+29            matrix_s[0][0] = matrix[(diagonal_block_row * OUT_TILE_DIM - 1)*N + (diagonal_block_col * OUT_TILE_DIM - 1)];
+30        }
+31    
+32    
+33        __syncthreads();
+34    
+35        for( int diagonal = 0; diagonal < 2*OUT_TILE_DIM; diagonal++ ) {
+36    
+37            int thread_limit = (diagonal < OUT_TILE_DIM) ? (diagonal) : (2 * OUT_TILE_DIM - diagonal);
+38    
+39            // Verify that the diagonal thread index does not exceed the maximum number of elements allowed by the diagonal at this iteration.
+40            if( threadIdx.x <= thread_limit ) {
+41    
+42                // Get the position of the thread inside the block.
+43                int pos_x = threadIdx.x;
+44                int pos_y = diagonal - pos_x;
+45    
+46                if( diagonal > OUT_TILE_DIM ) {
+47                    pos_x = OUT_TILE_DIM - threadIdx.x - 1;
+48                    pos_y = diagonal - pos_x - 1;
+49                }
+50    
+51                // Find the positions of the thread in the output matrix.
+52                int mat_row = diagonal_block_row * OUT_TILE_DIM + pos_y;
+53                int mat_col = diagonal_block_col * OUT_TILE_DIM + pos_x;
+54    
+55                if( mat_row < N && mat_col < N && pos_x + 1 < IN_TILE_DIM && pos_y + 1 < IN_TILE_DIM) {
+56    
+57                    // Calculate value left, top, and top-left neighbors.
+58                    // FIND A WAY TO MOVE THOSE CONDITIONAL STATEMENTS OUT OF HERE.
+59                    int top     = (mat_row == 0) ? ( (mat_col + 1) * DELETION ) : matrix_s[pos_y    ][pos_x + 1];
+60                    int left    = (mat_col == 0) ? ( (mat_row + 1) * INSERTION) : matrix_s[pos_y + 1][pos_x    ];
+61    
+62                    int topleft = 
+63                        (mat_row == 0) ? 
+64                            ( mat_col * DELETION ) : (mat_col == 0) ?
+65                                ( mat_row * INSERTION) : matrix_s[pos_y][pos_x]; 
+66    
+67                    // Determine scores of the three possible outcomes: insertion, deletion, and match.
+68                    int insertion = top  + INSERTION;
+69                    int deletion  = left + DELETION;
+70    
+71                    // Get the characters to verify if there is a match.
+72                    char ref_char   = reference[ mat_col ];
+73                    char query_char = query[ mat_row ];
+74    
+75                    int match = topleft + ( (ref_char == query_char) ? MATCH : MISMATCH );
+76                    
+77    
+78                    // Select the maximum between the three.
+79                    int max = (insertion > deletion) ? insertion : deletion;
+80                   max = (match > max) ? match : max;
+81    
+82                   // Update the matrix at the correct position
+83                   matrix_s[pos_y + 1][pos_x + 1] = max;
+84               
+85               }
+86           }
+87    
+88           __syncthreads();
+89    
+90       }
+91    
+92       // Update the output matrix at the correct positions (Writes are coalsced).
+93       for(int i=0; i<OUT_TILE_DIM; i++) {
+94           if( diagonal_block_row * OUT_TILE_DIM + i < N && diagonal_block_col * OUT_TILE_DIM + threadIdx.x < N && threadIdx.x < OUT_TILE_DIM ) {
+95               matrix[ (diagonal_block_row*OUT_TILE_DIM + i)*N + (diagonal_block_col * OUT_TILE_DIM) + threadIdx.x ] = matrix_s[i+1][threadIdx.x+1];
+96           }
+97       }
+98    
+99    }
+```
+
 ## Complexity Analysis:
 
 ### Needleman-Wunsch Algorithm on the CPU:
