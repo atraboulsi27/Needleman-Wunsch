@@ -64,6 +64,10 @@ done
             then
                 csv="$csv, `echo $output | cut -d \  -f 2`"
             fi
+            if [ $kernel1 != "" ]
+            then 
+                csv="$csv, `echo $output | cut -d \  -f 3`"
+            fi
             echo $csv >> benchmark.csv
             j=$(($j+$i/10))
         done
@@ -77,6 +81,10 @@ done
         if [ $kernel0 != "" ]
         then
             csv="$csv, `echo $output | cut -d \  -f 2`"
+        fi
+        if [ $kernel1 != "" ]
+        then 
+            csv="$csv, `echo $output | cut -d \  -f 3`"
         fi
         echo $csv >> benchmark.csv
         j=$(($j+5000))
