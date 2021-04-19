@@ -2,11 +2,6 @@
 #include "common.h"
 #include "timer.h"
 
-
-
-#include "common.h"
-#include "timer.h"
-
 // BLOCK SIZE is now limited to the size of shared memory
 // 31 is chosen instead of 32 as 1 row and 1 col are assigned to elements from a previously computed block.
 #define BLOCK_SIZE 32
