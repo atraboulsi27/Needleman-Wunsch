@@ -419,7 +419,148 @@ On line 83, we write the result of the nw comparison in the shared memory array 
 
 Finally, from lines 92 to 97, we read the results of the computation in the shared memory, in order to write them to global memory.
 
+### The Needleman-Wunsch Algorithm with Shared Memory and Slot Reuse:
 
+```C++
+ 1    __device__ void private_nw_function(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int matrix_s[BLOCK_SIZE][BLOCK_SIZE], int pos_x, int pos_y, int mat_row, int mat_col) {
+ 2
+ 3
+ 4        // Calculate value left, top, and top-left neighbors.
+ 5        int top = 
+ 6        (mat_row == 0) ? 
+ 7            ((mat_col + 1)*DELETION) : (pos_y == 0) ?
+ 8                matrix[ (mat_row - 1)*N + mat_col ] : matrix_s[pos_y - 1][pos_x   ];
+ 9
+10
+11        int left = 
+12            (mat_col == 0) ? 
+13                ((mat_row + 1)*INSERTION) : (pos_x == 0) ?
+14                    matrix[ mat_row*N + (mat_col - 1) ] : matrix_s[pos_y   ][pos_x - 1];
+15
+16        int topleft = 
+17            (mat_row == 0) ? 
+18                (mat_col*DELETION) : (mat_col == 0) ? 
+19                    (mat_row*INSERTION) : (pos_y == 0 || pos_x == 0) ? 
+20                        matrix[ (mat_row - 1)*N + mat_col - 1 ] : matrix_s[pos_y - 1][pos_x - 1]; 
+21
+22        // Determine scores of the three possible outcomes: insertion, deletion, and match.
+23        int insertion = top  + INSERTION;
+24        int deletion  = left + DELETION;
+25
+26        // Get the characters to verify if there is a match.
+27        char ref_char   = reference[mat_col];
+28        char query_char = query[mat_row];
+29
+30        int match = topleft + ( (ref_char == query_char) ? MATCH : MISMATCH );
+31
+32        // Select the maximum between the three.
+33        int max = (insertion > deletion) ? insertion : deletion;
+34        max = (match > max) ? match : max; 
+35
+36        // Update the matrix at the correct position
+37        matrix_s[ pos_y ][ pos_x ] = max;
+38
+39    }
+```
+```C++
+ 1__global__ void nw_kernel2(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
+ 2
+ 3
+ 4        // Transform 1D Grid Coordinates into 2D Diagonal Coordinates.
+ 5        int diagonal_block_row = blockIdx.x;
+ 6        int diagonal_block_col = iteration_number - diagonal_block_row;
+ 7
+ 8        if( iteration_number > gridDim.x) {
+ 9            diagonal_block_row = ( (N + BLOCK_SIZE*COVERAGE - 1)/(BLOCK_SIZE*COVERAGE) ) - blockIdx.x - 1;
+10            diagonal_block_col = iteration_number - diagonal_block_row;
+11        } 
+12
+13        int block_row = diagonal_block_row * BLOCK_SIZE * COVERAGE;
+14        int block_col = diagonal_block_col * BLOCK_SIZE * COVERAGE;
+15    
+16        __shared__ int matrix_s[BLOCK_SIZE][BLOCK_SIZE];
+17
+18        if( threadIdx.x < BLOCK_SIZE ) {
+19
+20            for( int diagonal = 0; diagonal < BLOCK_SIZE; diagonal++ ) {
+21
+22                // Get the position of the thread inside the block.
+23                int pos_x = threadIdx.x;
+24                int pos_y = diagonal - pos_x;
+25
+26                // Calculate the positions of the thread inside the matrix.
+27                int mat_row = block_row + pos_y;
+28                int mat_col = block_col + pos_x;
+29            
+30                if( mat_row < N && mat_col < N && pos_x < BLOCK_SIZE && pos_y < BLOCK_SIZE && pos_x >= 0 && pos_y >= 0) { 
+31
+32                    private_nw_function(reference, query, matrix, N, matrix_s, pos_x, pos_y, mat_row, mat_col); 
+33              
+34                }
+35
+36            }
+37
+38        } 
+39
+40        __syncthreads(); 
+41
+42        for(int i=0; i < COVERAGE * COVERAGE; i++) {
+43
+44            int output_row = 0;
+45
+46            for( int diagonal = 0; diagonal < BLOCK_SIZE; diagonal++ ) { 
+47
+48                // Get the position of the thread inside the block.
+49                int pos_x = threadIdx.x;
+50                int pos_y = diagonal - pos_x;
+51            
+52                // Calculate the positions of the thread inside the matrix.
+53                int mat_row = block_row + ( (i+1) / COVERAGE ) * BLOCK_SIZE + pos_y;
+54                int mat_col = block_col + ( (i+1) % COVERAGE ) * BLOCK_SIZE + pos_x;
+55            
+56                if( threadIdx.x >= BLOCK_SIZE ) {
+57
+58                    pos_x = 2 * (BLOCK_SIZE) - threadIdx.x - 1; 
+59                    pos_y = BLOCK_SIZE - pos_x + diagonal;
+60               
+61                    // Calculate the positions of the thread inside the matrix.
+62                    mat_row = block_row + ( i / COVERAGE ) * BLOCK_SIZE + pos_y;
+63                    mat_col = block_col + ( i % COVERAGE ) * BLOCK_SIZE + pos_x;
+64           
+65                }
+66     
+67                if( threadIdx.x < BLOCK_SIZE ) {
+68
+69                        int row = block_row + ( i / COVERAGE ) * BLOCK_SIZE + output_row;
+70                        int col = block_col + ( i % COVERAGE ) * BLOCK_SIZE + threadIdx.x;
+71
+72                        if( row < N && col < N ) {
+73
+74                            matrix[row * N + col] = matrix_s[output_row][threadIdx.x];
+75
+76                        }
+77
+78                }
+79            
+80                if( mat_row < N && mat_col < N && pos_x < BLOCK_SIZE && pos_y < BLOCK_SIZE && pos_x >= 0 && pos_y >= 0) {
+81        
+82                    private_nw_function(reference, query, matrix, N, matrix_s, pos_x, pos_y, mat_row, mat_col);
+83
+84                }
+85            
+86                __syncthreads();
+87    
+88                output_row++;
+89
+90            }
+91
+92            __syncthreads();
+93
+94        }
+95
+96    }
+
+```
 ## Complexity Analysis:
 
 ### Needleman-Wunsch Algorithm on the CPU:
