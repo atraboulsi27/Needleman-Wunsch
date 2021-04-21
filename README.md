@@ -112,6 +112,40 @@ Also, we have noticed that we are not maximizing our occupancy, and will therefo
 
 <img src="res/ComplicatedProcessingPattern.png" alt="Possible implementation pattern" width="800">
 
+### Attempt 3:
+
+In the previous iteration, we mentioned that thread coarsening was a goal for this iteration. However, we realized that the the term of "thread coarsening" does not directly apply to the optimization we described. Also, the description of the optimization that we wanted to apply for this iteration, was not really complete as we had not truly formed the idea of how such an optimization would work.
+
+The optimization we applied this iteration, is a little difficult to transcribe into words, however, we will try our best to make it understandable. In short what we did, is increase the number of threads per block while keeping the same amount of shared memory. To achieve this, we started processing a larger block of data than our shared memory array can handle by declaring twice as many threads as before (64 threads). The goal here, is to divide our threads into two different groups. The first one (group 1), threads 0 to 31, processes the upper-triangular part of shared memory, while the second one (group 2),  threads 32 to 63, processes the lower-triangular area of the matrix.  We have noticed that whenever, the upper-triangular part of the matrix is complete, we are able to output the first row of shared memory to the output array in a coalesced way: 
+
+<img src="res/FirstRowSharedMem.png" alt="Number of diagonal coded by color." width="800">
+
+After that the first slot in shared memory now becomes usable. We can use it to start processing values from a different "sub-block" of data, namely the block to the left of the current "sun-block":
+
+<img src="res/FirstRowSharedMemLeft.png" alt="Number of diagonal coded by color." width="800">
+
+As you can see we started processing a new value in the upper-triangular matrix. I would advise you to notice that it is now group 2 that is processing the green values, and that it has completed one diagonal in the lower-triangular area. Also notice that we have output a newly completed row. Because of this we can continue in the following way:
+
+<img src="res/FirstRowSharedMemLeftEnd1.png" alt="Number of diagonal coded by color." width="800">
+
+As you can see the first "sub-block" has been completed. In the next iteration we will have also completed the first row of the right sub-block, and be able to output it:
+
+<img src="res/FirstRowSharedMemRightStart.png" alt="Number of diagonal coded by color." width="800">
+
+We noticed that at this point, we can start processing the "sub-block" underneath the "sub-block" we just finished processing:
+
+<img src="res/FirstRowSharedMemLowStart.png" alt="Number of diagonal coded by color." width="800">
+
+In the end, we will have processed the following blocks:
+
+<img src="res/FirstRowSharedMemEnd.png" alt="Number of diagonal coded by color." width="800">
+
+We will show that this optimization is very effective as we are able to process more threads using our limited amounts of shared memory.
+
+At this point, we have optimized the code a lot, we are not very sure as to what else we could do to surely improve our run time. However, we may have an idea that might or might nor improve the run time. It consists of sacrificing out coalesced memory writes in order to achieve a better occupancy. Basically, we want to increase even more our number of threads per block by unlocking slots in shared memory even sooner than when a row is completely done. To do this, we can start writing diagonal from shared memory to the output array as soon as they are produced. In that way, we are able to declare many more threads, in our case, 16 x 32, or 512 threads.
+
+We are not yet sure if this trade off will work, we will therefore explore it in more details in the next iteration.
+
 ## Code Description:
 
 ### The Needleman-Wunsch Algorithm on the CPU:
@@ -307,6 +341,8 @@ Note: At line 69, notice the use of `__syncthread()` statement to make sure that
 
 ### The Needleman-Wunsch Algorithm with Shared Memory:
 
+Before explaining how our code works, we have applied some refactoring to the project. In this iteration, we have moved all the code related to evaluation of a matrix slot for the Needleman-Wunsch Algorithm into its own function to make the code more readable:
+
 ```C++
  1    #define IN_TILE_DIM 32
  2    #define OUT_TILE_DIM ( (IN_TILE_DIM) - 1 )
@@ -419,6 +455,168 @@ On line 83, we write the result of the nw comparison in the shared memory array 
 
 Finally, from lines 92 to 97, we read the results of the computation in the shared memory, in order to write them to global memory.
 
+### The Needleman-Wunsch Algorithm with Shared Memory and Slot Reuse:
+
+```C++
+ 1    __device__ void private_nw_function(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int matrix_s[BLOCK_SIZE][BLOCK_SIZE], int pos_x, int pos_y, int mat_row, int mat_col) {
+ 2
+ 3
+ 4        // Calculate value left, top, and top-left neighbors.
+ 5        int top = 
+ 6        (mat_row == 0) ? 
+ 7            ((mat_col + 1)*DELETION) : (pos_y == 0) ?
+ 8                matrix[ (mat_row - 1)*N + mat_col ] : matrix_s[pos_y - 1][pos_x   ];
+ 9
+10
+11        int left = 
+12            (mat_col == 0) ? 
+13                ((mat_row + 1)*INSERTION) : (pos_x == 0) ?
+14                    matrix[ mat_row*N + (mat_col - 1) ] : matrix_s[pos_y   ][pos_x - 1];
+15
+16        int topleft = 
+17            (mat_row == 0) ? 
+18                (mat_col*DELETION) : (mat_col == 0) ? 
+19                    (mat_row*INSERTION) : (pos_y == 0 || pos_x == 0) ? 
+20                        matrix[ (mat_row - 1)*N + mat_col - 1 ] : matrix_s[pos_y - 1][pos_x - 1]; 
+21
+22        // Determine scores of the three possible outcomes: insertion, deletion, and match.
+23        int insertion = top  + INSERTION;
+24        int deletion  = left + DELETION;
+25
+26        // Get the characters to verify if there is a match.
+27        char ref_char   = reference[mat_col];
+28        char query_char = query[mat_row];
+29
+30        int match = topleft + ( (ref_char == query_char) ? MATCH : MISMATCH );
+31
+32        // Select the maximum between the three.
+33        int max = (insertion > deletion) ? insertion : deletion;
+34        max = (match > max) ? match : max; 
+35
+36        // Update the matrix at the correct position
+37        matrix_s[ pos_y ][ pos_x ] = max;
+38
+39    }
+```
+
+The code you se above does not change anything, it is just a refactor of previous code.
+Now that we have established this, we can talk about our current implementation.
+
+```C++
+ 1__global__ void nw_kernel2(unsigned char* reference, unsigned char* query, int* matrix, unsigned int N, int iteration_number) {
+ 2
+ 3
+ 4        // Transform 1D Grid Coordinates into 2D Diagonal Coordinates.
+ 5        int diagonal_block_row = blockIdx.x;
+ 6        int diagonal_block_col = iteration_number - diagonal_block_row;
+ 7
+ 8        if( iteration_number > gridDim.x) {
+ 9            diagonal_block_row = ( (N + BLOCK_SIZE*COVERAGE - 1)/(BLOCK_SIZE*COVERAGE) ) - blockIdx.x - 1;
+10            diagonal_block_col = iteration_number - diagonal_block_row;
+11        } 
+12
+13        int block_row = diagonal_block_row * BLOCK_SIZE * COVERAGE;
+14        int block_col = diagonal_block_col * BLOCK_SIZE * COVERAGE;
+15    
+16        __shared__ int matrix_s[BLOCK_SIZE][BLOCK_SIZE];
+17
+18        if( threadIdx.x < BLOCK_SIZE ) {
+19
+20            for( int diagonal = 0; diagonal < BLOCK_SIZE; diagonal++ ) {
+21
+22                // Get the position of the thread inside the block.
+23                int pos_x = threadIdx.x;
+24                int pos_y = diagonal - pos_x;
+25
+26                // Calculate the positions of the thread inside the matrix.
+27                int mat_row = block_row + pos_y;
+28                int mat_col = block_col + pos_x;
+29            
+30                if( mat_row < N && mat_col < N && pos_x < BLOCK_SIZE && pos_y < BLOCK_SIZE && pos_x >= 0 && pos_y >= 0) { 
+31
+32                    private_nw_function(reference, query, matrix, N, matrix_s, pos_x, pos_y, mat_row, mat_col); 
+33              
+34                }
+35
+36            }
+37
+38        } 
+39
+40        __syncthreads(); 
+41
+42        for(int i=0; i < COVERAGE * COVERAGE; i++) {
+43
+44            int output_row = 0;
+45
+46            for( int diagonal = 0; diagonal < BLOCK_SIZE; diagonal++ ) { 
+47
+48                // Get the position of the thread inside the block.
+49                int pos_x = threadIdx.x;
+50                int pos_y = diagonal - pos_x;
+51            
+52                // Calculate the positions of the thread inside the matrix.
+53                int mat_row = block_row + ( (i+1) / COVERAGE ) * BLOCK_SIZE + pos_y;
+54                int mat_col = block_col + ( (i+1) % COVERAGE ) * BLOCK_SIZE + pos_x;
+55            
+56                if( threadIdx.x >= BLOCK_SIZE ) {
+57
+58                    pos_x = 2 * (BLOCK_SIZE) - threadIdx.x - 1; 
+59                    pos_y = BLOCK_SIZE - pos_x + diagonal;
+60               
+61                    // Calculate the positions of the thread inside the matrix.
+62                    mat_row = block_row + ( i / COVERAGE ) * BLOCK_SIZE + pos_y;
+63                    mat_col = block_col + ( i % COVERAGE ) * BLOCK_SIZE + pos_x;
+64           
+65                }
+66     
+67                if( threadIdx.x < BLOCK_SIZE ) {
+68
+69                        int row = block_row + ( i / COVERAGE ) * BLOCK_SIZE + output_row;
+70                        int col = block_col + ( i % COVERAGE ) * BLOCK_SIZE + threadIdx.x;
+71
+72                        if( row < N && col < N ) {
+73
+74                            matrix[row * N + col] = matrix_s[output_row][threadIdx.x];
+75
+76                        }
+77
+78                }
+79            
+80                if( mat_row < N && mat_col < N && pos_x < BLOCK_SIZE && pos_y < BLOCK_SIZE && pos_x >= 0 && pos_y >= 0) {
+81        
+82                    private_nw_function(reference, query, matrix, N, matrix_s, pos_x, pos_y, mat_row, mat_col);
+83
+84                }
+85            
+86                __syncthreads();
+87    
+88                output_row++;
+89
+90            }
+91
+92            __syncthreads();
+93
+94        }
+95
+96    }
+
+```
+
+From lines 4 to 14, we calculate the position of the current block in the matrix. Please notice that the size of one block is BLOCK_SIZE x COVERAGE. BLOCK_SIZE, is the size of one "sub-block" as well as the size of shared memory, COVERAGE represents how many "sub-blocks" there are on one side of the block.
+
+From lines 18 to 38, we fill the upper triangular values of shared memory based on the first sub-block.
+
+On line 40, we sync threads to make sure that the threads in the whole block are synced with each other.
+
+From lines 42 to 94, we have two nested loops. The first iterates over sub-blocks, while the second over diagonal lines within the current sub-blocks. Within those loops we perform the following operations:
+
+* We first declare on line 44 an output_row variable, this will let us know at which rows are complete within the "sub-block" being processed in the lowr-triangular area of shared memory. 
+* From lines 49 to 54, we calculate the positions of threads in the so-called group 1 dedicated for the upper triangular area of shared memory. 
+* From lines 56 to 65, we calculate the positions of threads in group 2., dedicated to the lower-triangular part of shared memory. 
+* From lines 67 to 78, we update the output matrix with the values of the row that was completed in the previous iterations (we use the threads in group 1)
+* From lines 80 to 84, we run the function private_nw_function on threads from both groups 1 and 2.
+* At this point, we have updated the necessary values in shared memory.
+* Note that on lines 88 and 92, we need to make sure to sync our threads to make sure of the continuity of loop.
 
 ## Complexity Analysis:
 
@@ -445,4 +643,8 @@ The following benchmark (the same one as before) was run on an Intel i9-9900K us
 
 There is a clear trend between all the implementations. As mentioned previously, the CPU implementation shows a clear quadratic trend. This is also the case for the two kernel implementations, however at a much slower rate. We have to keep in mind that the fact that  kernel 1 appears to evolve linearly is only an illusion created by the scale used for the y dimension.  If we had a much larger amount of GPU memory, we could have shown a much better better picture of how the trends evolve at higher input values.
 
+### Kernel1 vs. Kernel2:
 
+<img src="res/nw-plot-kernel2.png" alt="A run of the Needleman-Wunsch algorithm on the cpu and gpu" width="600">
+
+The following benchmark (the same one as before) was run on an Intel i9-9900K using 32GB of RAM running an Ubuntu 20.04 Operating System with an NVIDIA RTX 2080 with 8GB of RAM. As you can see, from an input size of 0 to 15,000, kernel2 performs slower than kernel 1 by a very minimal amount. However, past 15,000, kernel 2 starts out-performing kernel 1, achieving a better runtime by a factor of around 50%. At an input size of 40,000, kernel 2 runs in ~86 ms while kernel 1 runs in ~139 ms, while  or 1.6 times slower. As for the shapes of the curves, we notice, as expected that kernel 1 follows a quadratic trend. However, kernel 2 presents itself with a rougher shape. However, we still observe some kind of general quadratic trend. If we had displayed kernel2's graph in a better scale we would have been able to show a better graphic of this trend. As a note, it would be interesting to procure ourselves with a GPU that has a higher amount of memory to be able to truly appreciate how much faster kernel 2 is.
