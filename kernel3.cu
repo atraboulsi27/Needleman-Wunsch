@@ -66,20 +66,17 @@ __global__ void nw_kernel3(unsigned char* reference, unsigned char* query, int* 
     __shared__ int matrix_s[BLOCK_SIZE][BLOCK_SIZE];
 
     // Setup thread activation
+    if(  )
+    for( int i=0; i < BLOCK_SIZE; i++ ) {
+
+
+
+    }
+
     bool isThreadActive = (threadIdx.x + threadIdx.y) % 2 == 0;
-    bool shouldThreadLoadNewValue = false;
+    bool shouldThreadLoadNewValue = false; 
+ 
 
-    for( int i=0; i < 2*COVERAGE; i++ ) {
-
-        
-
-        if( shouldThreadLoadNewValue ) {
-
-            private_nw_function_3(reference, query, matrix, N, matrix_s, 0, 0, y, x);
-
-        }
-    } 
-    
     if( threadIdx.x < BLOCK_SIZE ) {
 
         for( int diagonal = 0; diagonal < BLOCK_SIZE; diagonal++ ) {
